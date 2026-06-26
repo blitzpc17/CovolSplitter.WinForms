@@ -710,4 +710,60 @@ public sealed class CovolRepository
 
         await tx.CommitAsync(ct);
     }
+    public async Task<int> ActualizarCalibracionesMensualAsync(int anio, int mes, DateOnly nuevaFecha)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync();
+
+        var productos = await cn.QueryAsync<dynamic>(@"
+            SELECT DISTINCT p.id, p.xml_producto_base
+            FROM covol.productos p
+            JOIN covol.transacciones t ON p.id = t.producto_id
+            WHERE t.anio = @anio AND t.mes = @mes AND p.xml_producto_base IS NOT NULL AND p.xml_producto_base != '';",
+            new { anio, mes }
+        );
+
+        int updatedCount = 0;
+        System.Xml.Linq.XNamespace covol = "https://www.sat.gob.mx/esquemas/ControlesVolumetricos";
+
+        foreach (var prod in productos)
+        {
+            string xmlBase = prod.xml_producto_base;
+            bool changed = false;
+
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Parse(xmlBase);
+                var nodoTanque = doc.Descendants(covol + "VigenciaCalibracionTanque").FirstOrDefault();
+                if (nodoTanque != null)
+                {
+                    nodoTanque.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    changed = true;
+                }
+
+                var nodoSist = doc.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault();
+                if (nodoSist != null)
+                {
+                    nodoSist.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    await cn.ExecuteAsync(@"
+                        UPDATE covol.productos 
+                        SET xml_producto_base = @xml 
+                        WHERE id = @id;", 
+                        new { xml = doc.ToString(System.Xml.Linq.SaveOptions.DisableFormatting), id = prod.id }
+                    );
+                    updatedCount++;
+                }
+            }
+            catch
+            {
+                // Ignorar XML mal formado
+            }
+        }
+        return updatedCount;
+    }
 }

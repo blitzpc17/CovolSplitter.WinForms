@@ -1,4 +1,4 @@
-﻿using CovolSplitter.WinForms.Controls;
+using CovolSplitter.WinForms.Controls;
 
 namespace CovolSplitter.WinForms;
 
@@ -92,6 +92,10 @@ partial class MainForm
         checkedDiasXml = new CheckedListBox();
         lblConsultaConteo = new Label();
         dgvConsulta = new DataGridView();
+        grpModificacionMasiva = new GroupBox();
+        lblFechaCalibracion = new Label();
+        dtpCalibracionMasiva = new DateTimePicker();
+        btnActualizarCalibracion = new Button();
         tabExportacion = new TabPage();
         grpImportacion = new GroupBox();
         btnImportarMensual = new Button();
@@ -111,6 +115,7 @@ partial class MainForm
         ((System.ComponentModel.ISupportInitialize)numAnio).BeginInit();
         ((System.ComponentModel.ISupportInitialize)numMes).BeginInit();
         ((System.ComponentModel.ISupportInitialize)dgvConsulta).BeginInit();
+        grpModificacionMasiva.SuspendLayout();
         tabExportacion.SuspendLayout();
         grpImportacion.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)splitExportacion).BeginInit();
@@ -204,6 +209,7 @@ partial class MainForm
         // 
         // tabConsulta
         // 
+        tabConsulta.Controls.Add(grpModificacionMasiva);
         tabConsulta.Controls.Add(grpFiltrosConsulta);
         tabConsulta.Controls.Add(dgvConsulta);
         tabConsulta.Location = new Point(4, 24);
@@ -459,16 +465,57 @@ partial class MainForm
         dgvConsulta.AllowUserToDeleteRows = false;
         dgvConsulta.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         dgvConsulta.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-        dgvConsulta.Location = new Point(18, 218);
+        dgvConsulta.Location = new Point(18, 280);
         dgvConsulta.Margin = new Padding(3, 2, 3, 2);
         dgvConsulta.MultiSelect = false;
         dgvConsulta.Name = "dgvConsulta";
         dgvConsulta.ReadOnly = true;
         dgvConsulta.RowHeadersWidth = 28;
         dgvConsulta.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-        dgvConsulta.Size = new Size(1152, 358);
+        dgvConsulta.Size = new Size(1152, 296);
         dgvConsulta.TabIndex = 1;
         dgvConsulta.CellDoubleClick += dgvConsulta_CellDoubleClick;
+        // 
+        // grpModificacionMasiva
+        // 
+        grpModificacionMasiva.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        grpModificacionMasiva.Controls.Add(lblFechaCalibracion);
+        grpModificacionMasiva.Controls.Add(dtpCalibracionMasiva);
+        grpModificacionMasiva.Controls.Add(btnActualizarCalibracion);
+        grpModificacionMasiva.Location = new Point(18, 212);
+        grpModificacionMasiva.Margin = new Padding(3, 2, 3, 2);
+        grpModificacionMasiva.Name = "grpModificacionMasiva";
+        grpModificacionMasiva.Size = new Size(1152, 60);
+        grpModificacionMasiva.TabIndex = 2;
+        grpModificacionMasiva.TabStop = false;
+        grpModificacionMasiva.Text = "Modificación Masiva de Calibraciones (Mes/Año)";
+        // 
+        // lblFechaCalibracion
+        // 
+        lblFechaCalibracion.AutoSize = true;
+        lblFechaCalibracion.Location = new Point(16, 28);
+        lblFechaCalibracion.Name = "lblFechaCalibracion";
+        lblFechaCalibracion.Size = new Size(140, 15);
+        lblFechaCalibracion.TabIndex = 0;
+        lblFechaCalibracion.Text = "Nueva Fecha Calibración:";
+        // 
+        // dtpCalibracionMasiva
+        // 
+        dtpCalibracionMasiva.Format = DateTimePickerFormat.Short;
+        dtpCalibracionMasiva.Location = new Point(160, 25);
+        dtpCalibracionMasiva.Name = "dtpCalibracionMasiva";
+        dtpCalibracionMasiva.Size = new Size(120, 23);
+        dtpCalibracionMasiva.TabIndex = 1;
+        // 
+        // btnActualizarCalibracion
+        // 
+        btnActualizarCalibracion.Location = new Point(290, 24);
+        btnActualizarCalibracion.Name = "btnActualizarCalibracion";
+        btnActualizarCalibracion.Size = new Size(150, 26);
+        btnActualizarCalibracion.TabIndex = 2;
+        btnActualizarCalibracion.Text = "Actualizar Vigencia";
+        btnActualizarCalibracion.UseVisualStyleBackColor = true;
+        btnActualizarCalibracion.Click += btnActualizarCalibracion_Click;
         // 
         // tabExportacion
         // 
@@ -537,16 +584,16 @@ partial class MainForm
         lblEstado.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         lblEstado.Location = new Point(16, 60);
         lblEstado.Name = "lblEstado";
-        lblEstado.Size = new Size(1117, 15);
+        lblEstado.Size = new Size(315, 25);
         lblEstado.TabIndex = 3;
         lblEstado.Text = "Sin proceso.";
         // 
         // lblDetalle
         // 
         lblDetalle.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        lblDetalle.Location = new Point(337, 52);
+        lblDetalle.Location = new Point(337, 60);
         lblDetalle.Name = "lblDetalle";
-        lblDetalle.Size = new Size(796, 15);
+        lblDetalle.Size = new Size(796, 25);
         lblDetalle.TabIndex = 4;
         // 
         // splitExportacion
@@ -642,6 +689,8 @@ partial class MainForm
         tabConsulta.ResumeLayout(false);
         grpFiltrosConsulta.ResumeLayout(false);
         grpFiltrosConsulta.PerformLayout();
+        grpModificacionMasiva.ResumeLayout(false);
+        grpModificacionMasiva.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)numAnio).EndInit();
         ((System.ComponentModel.ISupportInitialize)numMes).EndInit();
         ((System.ComponentModel.ISupportInitialize)dgvConsulta).EndInit();
@@ -655,4 +704,9 @@ partial class MainForm
         ((System.ComponentModel.ISupportInitialize)dgvDetalleDiario).EndInit();
         ResumeLayout(false);
     }
+
+    private GroupBox grpModificacionMasiva;
+    private Label lblFechaCalibracion;
+    private DateTimePicker dtpCalibracionMasiva;
+    private Button btnActualizarCalibracion;
 }

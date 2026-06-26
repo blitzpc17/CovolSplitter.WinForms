@@ -390,6 +390,9 @@ public partial class MainForm : Form
 
         _cargandoFechaDesdeCodigo = true;
 
+        dtpXmlDia.MinDate = DateTimePicker.MinimumDateTime;
+        dtpXmlDia.MaxDate = DateTimePicker.MaximumDateTime;
+        
         dtpXmlDia.MinDate = primero;
         dtpXmlDia.MaxDate = ultimo;
 
@@ -1069,5 +1072,56 @@ public partial class MainForm : Form
 
         tabPrincipal.SelectedTab = tabConfiguracion;
         return false;
+    }
+
+    private async void btnActualizarCalibracion_Click(object? sender, EventArgs e)
+    {
+        if (!TieneConexionActiva())
+            return;
+
+        int anio = (int)numAnio.Value;
+        int mes = (int)numMes.Value;
+        DateOnly nuevaFecha = DateOnly.FromDateTime(dtpCalibracionMasiva.Value);
+
+        var confirm = MessageBox.Show(
+            this, 
+            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los XMLs base del mes {mes:00}/{anio}?", 
+            "Confirmar modificación masiva", 
+            MessageBoxButtons.YesNo, 
+            MessageBoxIcon.Question
+        );
+
+        if (confirm != DialogResult.Yes)
+            return;
+
+        btnActualizarCalibracion.Enabled = false;
+
+        try
+        {
+            var repo = new CovolRepository(_connectionString!);
+            int updated = await repo.ActualizarCalibracionesMensualAsync(anio, mes, nuevaFecha);
+
+            MessageBox.Show(
+                this, 
+                $"Se actualizaron las fechas de calibración en {updated} plantillas. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
+                "Actualización exitosa", 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Information
+            );
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this, 
+                "Ocurrió un error al actualizar las calibraciones: " + ex.Message, 
+                "Error", 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Error
+            );
+        }
+        finally
+        {
+            btnActualizarCalibracion.Enabled = true;
+        }
     }
 }

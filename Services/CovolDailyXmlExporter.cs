@@ -70,7 +70,7 @@ public sealed class CovolDailyXmlExporter
         var outputPath = Path.Combine(outputFolder, fileName);
 
         var productos = (await cn.QueryAsync(new CommandDefinition(@"
-            SELECT DISTINCT
+            SELECT
                 p.id AS producto_id,
                 p.clave_producto,
                 p.clave_subproducto,
@@ -91,6 +91,14 @@ public sealed class CovolDailyXmlExporter
                         COALESCE(p.marca_comercial, '')
                     ) = ANY(@productKeys)
               )
+            GROUP BY
+                p.id,
+                p.clave_producto,
+                p.clave_subproducto,
+                p.marca_comercial,
+                p.octanaje,
+                p.combustible_no_fosil,
+                p.xml_producto_base
             ORDER BY
                 CASE 
                     WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
