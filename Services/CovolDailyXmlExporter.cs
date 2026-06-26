@@ -1,4 +1,4 @@
-﻿using System.Xml.Linq;
+using System.Xml.Linq;
 using Dapper;
 using Npgsql;
 
@@ -17,13 +17,13 @@ public sealed class CovolDailyXmlExporter
         _connectionString = connectionString;
     }
 
-    public async Task ExportDailyXmlAsync(
+    public async Task<string> ExportDailyXmlAsync(
         int anio,
         int mes,
         DateOnly fechaOperacion,
         string[] productKeys,
         string[] tiposMovimiento,
-        string outputPath,
+        string outputFolder,
         CancellationToken ct = default)
     {
         var fechaDb = fechaOperacion.ToDateTime(TimeOnly.MinValue);
@@ -33,6 +33,7 @@ public sealed class CovolDailyXmlExporter
 
         var header = await cn.QueryFirstOrDefaultAsync(new CommandDefinition(@"
             SELECT
+                a.nombre_archivo,
                 a.version_xml,
                 a.rfc_contribuyente,
                 a.rfc_representante_legal,
@@ -50,6 +51,22 @@ public sealed class CovolDailyXmlExporter
 
         if (header is null)
             throw new InvalidOperationException("No se encontró encabezado base para generar XML diario.");
+
+        var tipoReporte = "EXO";
+        var nomArchivo = (string?)header.nombre_archivo;
+        if (!string.IsNullOrWhiteSpace(nomArchivo))
+        {
+            var parts = nomArchivo.Split('_');
+            if (parts.Length >= 7) tipoReporte = parts[6];
+        }
+
+        var guid = Guid.NewGuid().ToString("D").ToUpperInvariant();
+        var rfcC = (string?)header.rfc_contribuyente ?? "XAXX010101000";
+        var rfcP = (string?)header.rfc_proveedor ?? "XAXX010101000";
+        var cve = (string?)header.clave_instalacion ?? "EDS";
+
+        var fileName = $"D_{guid}_{rfcC}_{rfcP}_{fechaOperacion:yyyy-MM-dd}_{cve}_{tipoReporte}_XML.xml";
+        var outputPath = Path.Combine(outputFolder, fileName);
 
         var productos = (await cn.QueryAsync(new CommandDefinition(@"
             SELECT DISTINCT
@@ -92,8 +109,18 @@ public sealed class CovolDailyXmlExporter
             new XElement(Covol + "RfcContribuyente", header.rfc_contribuyente ?? ""),
             new XElement(Covol + "RfcRepresentanteLegal", header.rfc_representante_legal ?? ""),
             new XElement(Covol + "RfcProveedor", header.rfc_proveedor ?? ""),
+            new XElement(Covol + "Caracter",
+                new XElement(Covol + "TipoCaracter", "permisionario"),
+                new XElement(Covol + "ModalidadPermiso", "PER2"),
+                new XElement(Covol + "NumPermiso", "PL/3664/EXP/ES/2015")
+            ),
             new XElement(Covol + "ClaveInstalacion", header.clave_instalacion ?? ""),
             new XElement(Covol + "DescripcionInstalacion", header.descripcion_instalacion ?? ""),
+            new XElement(Covol + "NumeroPozos", 0),
+            new XElement(Covol + "NumeroTanques", 3),
+            new XElement(Covol + "NumeroDuctosEntradaSalida", 0),
+            new XElement(Covol + "NumeroDuctosTransporteDistribucion", 0),
+            new XElement(Covol + "NumeroDispensarios", 4),
             new XElement(Covol + "FechaYHoraCorte", $"{fechaOperacion:yyyy-MM-dd}T23:59:59-06:00")
         );
 
@@ -201,6 +228,16 @@ public sealed class CovolDailyXmlExporter
             root.Add(productoElement);
         }
 
+        var bitacora = new XElement(Covol + "BITACORA",
+            new XElement(Covol + "NumeroRegistro", 1),
+            new XElement(Covol + "FechaYHoraEvento", $"{fechaOperacion:yyyy-MM-dd}T23:59:59-06:00"),
+            new XElement(Covol + "UsuarioResponsable", "Eucario León"),
+            new XElement(Covol + "TipoEvento", 5),
+            new XElement(Covol + "DescripcionEvento", $"Generacion XML Diario {fileName}")
+        );
+
+        root.Add(bitacora);
+
         var doc = new XDocument(
             new XDeclaration("1.0", "UTF-8", "yes"),
             root
@@ -212,6 +249,8 @@ public sealed class CovolDailyXmlExporter
             Directory.CreateDirectory(folder);
 
         doc.Save(outputPath);
+
+        return outputPath;
     }
 
     public async Task<int> ExportMonthXmlAsync(
@@ -229,7 +268,7 @@ public sealed class CovolDailyXmlExporter
         await cn.OpenAsync(ct);
 
         var fechas = (await cn.QueryAsync<DateTime>(new CommandDefinition(@"
-            SELECT DISTINCT fecha_operacion
+            SELECT DISTINCT fecha_operacion::timestamp
             FROM covol.transacciones
             WHERE anio = @anio
               AND mes = @mes
@@ -244,20 +283,17 @@ public sealed class CovolDailyXmlExporter
         {
             ct.ThrowIfCancellationRequested();
 
-            var fileName = $"D_{fecha:yyyy-MM-dd}_COVOL_DIARIO.xml";
-            var path = Path.Combine(outputFolder, fileName);
-
-            progress?.Report($"Generando {fileName}...");
-
-            await ExportDailyXmlAsync(
+            var path = await ExportDailyXmlAsync(
                 anio,
                 mes,
                 fecha,
                 productKeys,
                 tiposMovimiento,
-                path,
+                outputFolder,
                 ct
             );
+
+            progress?.Report($"Generado {Path.GetFileName(path)}...");
 
             total++;
         }

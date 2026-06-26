@@ -635,6 +635,22 @@ public sealed class CovolRepository
             new { anio, mes }
         );
     }
+    public async Task<long?> GetArchivoIdBySha256Async(string sha256, CancellationToken ct = default)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        return await cn.QuerySingleOrDefaultAsync<long?>(new CommandDefinition("SELECT id FROM covol.archivos WHERE sha256 = @sha256 LIMIT 1;", new { sha256 }, cancellationToken: ct));
+    }
 
+    public async Task DeleteArchivoAsync(long archivoId, CancellationToken ct = default)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync(ct);
+        await using var tx = await cn.BeginTransactionAsync(ct);
 
+                await cn.ExecuteAsync(new CommandDefinition("DELETE FROM covol.transacciones WHERE archivo_id = @archivoId;", new { archivoId }, transaction: tx, cancellationToken: ct));
+        await cn.ExecuteAsync(new CommandDefinition("DELETE FROM covol.productos WHERE archivo_id = @archivoId;", new { archivoId }, transaction: tx, cancellationToken: ct));
+        await cn.ExecuteAsync(new CommandDefinition("DELETE FROM covol.archivos WHERE id = @archivoId;", new { archivoId }, transaction: tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+    }
 }

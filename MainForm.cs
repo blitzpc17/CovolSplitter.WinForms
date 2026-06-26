@@ -1,4 +1,4 @@
-using CovolSplitter.Winforms.Models;
+锘縰sing CovolSplitter.Winforms.Models;
 using CovolSplitter.WinForms.Controls;
 using CovolSplitter.WinForms.Models;
 using CovolSplitter.WinForms.Services;
@@ -49,7 +49,7 @@ public partial class MainForm : Form
         }
         else
         {
-            lblConfigEstado.Text = "Ingresa la cadena de conexi髇 y presiona Probar conexi髇.";
+            lblConfigEstado.Text = "Ingresa la cadena de conexi贸n y presiona Probar conexi贸n.";
             lblConfigEstado.ForeColor = Color.Firebrick;
             tabPrincipal.SelectedTab = tabConfiguracion;
         }
@@ -76,7 +76,7 @@ public partial class MainForm : Form
 
             HabilitarSistema();
 
-            lblConfigEstado.Text = "Conexi髇 v醠ida. Sistema listo.";
+            lblConfigEstado.Text = "Conexi贸n v谩lida. Sistema listo.";
             lblConfigEstado.ForeColor = Color.ForestGreen;
 
             await CargarFiltrosAutomaticosAsync();
@@ -85,7 +85,7 @@ public partial class MainForm : Form
         {
             BloquearSistema();
 
-            lblConfigEstado.Text = "No se pudo validar la conexi髇. Revisa la configuraci髇.";
+            lblConfigEstado.Text = "No se pudo validar la conexi贸n. Revisa la configuraci贸n.";
             lblConfigEstado.ForeColor = Color.Firebrick;
             tabPrincipal.SelectedTab = tabConfiguracion;
         }
@@ -135,8 +135,8 @@ public partial class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                "La cadena de conexi髇 es obligatoria.",
-                "Configuraci髇",
+                "La cadena de conexi贸n es obligatoria.",
+                "Configuraci贸n",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
             );
@@ -146,7 +146,7 @@ public partial class MainForm : Form
         btnProbarConexion.Enabled = false;
         btnGuardarConfiguracion.Enabled = false;
         lblConfigEstado.ForeColor = Color.Black;
-        lblConfigEstado.Text = "Probando conexi髇...";
+        lblConfigEstado.Text = "Probando conexi贸n...";
 
         try
         {
@@ -164,8 +164,8 @@ public partial class MainForm : Form
             HabilitarSistema();
 
             lblConfigEstado.Text = guardar
-                ? "Conexi髇 v醠ida y configuraci髇 guardada."
-                : "Conexi髇 v醠ida.";
+                ? "Conexi贸n v谩lida y configuraci贸n guardada."
+                : "Conexi贸n v谩lida.";
 
             lblConfigEstado.ForeColor = Color.ForestGreen;
 
@@ -174,7 +174,7 @@ public partial class MainForm : Form
             MessageBox.Show(
                 this,
                 lblConfigEstado.Text,
-                "Configuraci髇",
+                "Configuraci贸n",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
             );
@@ -183,13 +183,13 @@ public partial class MainForm : Form
         {
             BloquearSistema();
 
-            lblConfigEstado.Text = "Error de conexi髇.";
+            lblConfigEstado.Text = "Error de conexi贸n.";
             lblConfigEstado.ForeColor = Color.Firebrick;
 
             MessageBox.Show(
                 this,
                 ex.Message,
-                "Error de conexi髇",
+                "Error de conexi贸n",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -252,7 +252,7 @@ public partial class MainForm : Form
             CargarDiasXml(dias);
 
             lblConsultaConteo.Text =
-                $"Filtros cargados autom醫icamente. Productos: {productos.Count:N0} | Movimientos: {movimientos.Count:N0} | D韆s: {dias.Count:N0}";
+                $"Filtros cargados autom谩ticamente. Productos: {productos.Count:N0} | Movimientos: {movimientos.Count:N0} | D铆as: {dias.Count:N0}";
         }
         catch (Exception ex)
         {
@@ -278,7 +278,7 @@ public partial class MainForm : Form
         checkedDiasXml.Items.Add(new FilterOption
         {
             Value = "TODOS",
-            Text = "TODOS LOS D虯S"
+            Text = "TODOS LOS D脥AS"
         }, false);
 
         foreach (var dia in dias)
@@ -738,7 +738,7 @@ public partial class MainForm : Form
         {
             MessageBox.Show(
                 this,
-                "El registro seleccionado no tiene fecha de operaci髇.",
+                "El registro seleccionado no tiene fecha de operaci贸n.",
                 "Consulta",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
@@ -832,7 +832,7 @@ public partial class MainForm : Form
         _cts = new CancellationTokenSource();
 
         progressBar1.Value = 0;
-        lblEstado.Text = "Iniciando importaci髇...";
+        lblEstado.Text = "Iniciando importaci贸n...";
         lblDetalle.Text = Path.GetFileName(ofd.FileName);
 
         var progress = new Progress<CovolImportProgress>(p =>
@@ -844,11 +844,40 @@ public partial class MainForm : Form
                 lblDetalle.Text = p.Message;
         });
 
-        try
+                try
         {
+            var sha256 = await CovolXmlParser.Sha256Async(ofd.FileName, _cts.Token);
+            var repo = new CovolRepository(_connectionString!);
+            var existingId = await repo.GetArchivoIdBySha256Async(sha256, _cts.Token);
+
+            if (existingId.HasValue)
+            {
+                var promptResult = MessageBox.Show(
+                    this,
+                    "Este archivo XML ya ha sido importado previamente.\n驴Deseas reemplazarlo con la nueva importaci贸n? La informaci贸n anterior ser谩 eliminada.",
+                    "Archivo existente",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning
+                );
+
+                if (promptResult == DialogResult.No)
+                {
+                    btnImportarMensual.Enabled = true;
+                    btnCancelar.Enabled = false;
+                    _cts?.Dispose();
+                    _cts = null;
+                    lblEstado.Text = "Importaci贸n cancelada por el usuario.";
+                    return;
+                }
+
+                lblEstado.Text = "Eliminando importaci贸n anterior...";
+                await repo.DeleteArchivoAsync(existingId.Value, _cts.Token);
+                lblEstado.Text = "Iniciando importaci贸n...";
+            }
+
             var service = new CovolImportService(
                 new CovolXmlParser(),
-                new CovolRepository(_connectionString!)
+                repo
             );
 
             var archivoId = await Task.Run(() =>
@@ -857,7 +886,7 @@ public partial class MainForm : Form
 
             MessageBox.Show(
                 this,
-                $"Importaci髇 finalizada. Archivo ID: {archivoId}",
+                $"Importaci贸n finalizada. Archivo ID: {archivoId}",
                 "OK",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
@@ -866,14 +895,24 @@ public partial class MainForm : Form
             await CargarDiariosDerivadosAsync(archivoId);
             await CargarFiltrosAutomaticosAsync();
         }
-        catch (OperationCanceledException)
+                catch (OperationCanceledException)
         {
             MessageBox.Show(
                 this,
-                "Importaci髇 cancelada.",
+                "Importaci贸n cancelada.",
                 "Cancelado",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
+            );
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "23505")
+        {
+            MessageBox.Show(
+                this,
+                "Este archivo XML ya ha sido importado previamente.\n\nPara exportar sus diarios, seleccione el mes correspondiente en los filtros y presione 'Generar XML Diario'.",
+                "Archivo ya importado",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
             );
         }
         catch (Exception ex)
@@ -1001,8 +1040,8 @@ public partial class MainForm : Form
 
         MessageBox.Show(
             this,
-            "Primero debes configurar y validar la conexi髇 a PostgreSQL.",
-            "Configuraci髇 requerida",
+            "Primero debes configurar y validar la conexi贸n a PostgreSQL.",
+            "Configuraci贸n requerida",
             MessageBoxButtons.OK,
             MessageBoxIcon.Warning
         );

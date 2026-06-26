@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 using CovolSplitter.WinForms.Models;
@@ -356,7 +356,7 @@ namespace CovolSplitter.WinForms.Services
                 : null;
         }
 
-        private static async Task<string> Sha256Async(string filePath, CancellationToken ct)
+        public static async Task<string> Sha256Async(string filePath, CancellationToken ct = default)
         {
             await using var fs = File.OpenRead(filePath);
             var bytes = await SHA256.HashDataAsync(fs, ct);
