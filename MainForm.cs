@@ -1,4 +1,4 @@
-﻿using CovolSplitter.Winforms.Models;
+using CovolSplitter.Winforms.Models;
 using CovolSplitter.WinForms.Controls;
 using CovolSplitter.WinForms.Models;
 using CovolSplitter.WinForms.Services;
@@ -71,6 +71,9 @@ public partial class MainForm : Form
                 txtConnectionString.Text = dbConnectionString;
                 cn = dbConnectionString;
             }
+
+            var covolRepo = new CovolRepository(cn);
+            await covolRepo.EnsureProductosXmlColumnAsync();
 
             _connectionString = cn;
 
@@ -968,8 +971,13 @@ public partial class MainForm : Form
             return;
 
         var archivoId = Convert.ToInt64(row.Cells["archivo_mensual_id"].Value);
-        var fecha = DateOnly.FromDateTime(Convert.ToDateTime(row.Cells["fecha_operacion"].Value));
-
+        var fechaValue = row.Cells["fecha_operacion"].Value;
+        var fecha = fechaValue switch
+        {
+            DateOnly d => d,
+            DateTime dt => DateOnly.FromDateTime(dt),
+            _ => DateOnly.FromDateTime(Convert.ToDateTime(fechaValue))
+        };
         var repo = new CovolRepository(_connectionString!);
         var txs = (await repo.GetDailyTransactionsAsync(archivoId, fecha)).ToList();
 
@@ -984,6 +992,19 @@ public partial class MainForm : Form
         grid.DataSource = data;
 
         AplicarFormatoGrid(grid);
+
+        int count = 0;
+        if (data is System.Collections.ICollection collection)
+            count = collection.Count;
+        else if (data != null)
+            count = grid.Rows.Count;
+
+        if (grid == dgvConsulta && lblConsultaConteo != null)
+            lblConsultaConteo.Text = $"Registros encontrados: {count:N0}";
+        else if (grid == dgvDiarios && lblDiarios != null)
+            lblDiarios.Text = $"Diarios Generados: {count:N0}";
+        else if (grid == dgvDetalleDiario && lblDetalleDiario != null)
+            lblDetalleDiario.Text = $"Detalle (Transacciones): {count:N0}";
     }
 
     private void AplicarFormatoGrid(DataGridView grid)

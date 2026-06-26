@@ -1,4 +1,4 @@
-﻿using System.Text.Encodings.Web;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Dapper;
 using Npgsql;
@@ -220,6 +220,12 @@ public sealed class CovolDailyJsonExporter
                     OR t.tipo_movimiento = ANY(@tiposMovimiento)
               )
             ORDER BY
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END,
                 p.marca_comercial,
                 t.tipo_movimiento,
                 t.fecha_transaccion;",

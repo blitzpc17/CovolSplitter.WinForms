@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using CovolSplitter.WinForms.Models;
 using Dapper;
 using Npgsql;
 
@@ -75,7 +76,8 @@ public sealed class CovolDailyXmlExporter
                 p.clave_subproducto,
                 p.marca_comercial,
                 p.octanaje,
-                p.combustible_no_fosil
+                p.combustible_no_fosil,
+                p.xml_producto_base
             FROM covol.transacciones t
             JOIN covol.productos p ON p.id = t.producto_id
             WHERE t.anio = @anio
@@ -89,7 +91,13 @@ public sealed class CovolDailyXmlExporter
                         COALESCE(p.marca_comercial, '')
                     ) = ANY(@productKeys)
               )
-            ORDER BY p.marca_comercial;",
+            ORDER BY
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END, p.marca_comercial;",
             new
             {
                 anio,
@@ -138,7 +146,13 @@ public sealed class CovolDailyXmlExporter
                   AND mes = @mes
                   AND dia = @dia
                   AND @marca ILIKE '%' || producto_like || '%'
-                ORDER BY producto_like
+                ORDER BY 
+                    CASE 
+                        WHEN producto_like ILIKE '%MAGNA%' THEN 1
+                        WHEN producto_like ILIKE '%PREMIUM%' THEN 2
+                        WHEN producto_like ILIKE '%DIESEL%' THEN 3
+                        ELSE 4
+                    END, producto_like
                 LIMIT 1;",
                 new
                 {
@@ -172,59 +186,121 @@ public sealed class CovolDailyXmlExporter
                 cancellationToken: ct
             ));
 
-            var productoElement = new XElement(Covol + "PRODUCTO",
-                new XElement(Covol + "ClaveProducto", producto.clave_producto ?? ""),
-                new XElement(Covol + "ClaveSubProducto", producto.clave_subproducto ?? ""),
-                new XElement(Covol + "MarcaComercial", producto.marca_comercial ?? "")
-            );
+            var txs = (await cn.QueryAsync<CovolTransaction>(new CommandDefinition(@"
+                SELECT
+                    t.tipo_movimiento AS TipoMovimiento,
+                    t.fecha_transaccion AS FechaTransaccion,
+                    t.rfc_cliente_proveedor AS RfcClienteProveedor,
+                    t.nombre_cliente_proveedor AS NombreClienteProveedor,
+                    t.permiso_proveedor AS PermisoProveedor,
+                    t.cfdi AS Cfdi,
+                    t.cfdi_texto AS CfdiTexto,
+                    t.tipo_cfdi AS TipoCfdi,
+                    t.precio_compra AS PrecioCompra,
+                    t.precio_venta_publico AS PrecioVentaPublico,
+                    t.precio_venta AS PrecioVenta,
+                    t.volumen AS Volumen,
+                    t.um AS Um
+                FROM covol.transacciones t
+                JOIN covol.productos p ON p.id = t.producto_id
+                WHERE t.anio = @anio
+                  AND t.mes = @mes
+                  AND t.fecha_operacion = @fechaOperacion
+                  AND p.marca_comercial ILIKE '%' || @productoLike || '%';",
+                new
+                {
+                    anio,
+                    mes,
+                    fechaOperacion = fechaDb,
+                    productoLike
+                },
+                cancellationToken: ct
+            ))).ToList();
 
-            if (producto.octanaje is not null)
+            string? xmlBase = producto.xml_producto_base;
+            XElement productoElement;
+
+            if (!string.IsNullOrWhiteSpace(xmlBase))
             {
-                productoElement.Add(
-                    new XElement(Covol + "Gasolina",
-                        new XElement(Covol + "ComposOctanajeGasolina", producto.octanaje),
-                        new XElement(Covol + "GasolinaConCombustibleNoFosil", producto.combustible_no_fosil ?? "No")
-                    )
+                productoElement = XElement.Parse(xmlBase);
+                
+                var recepcionesTx = txs.Where(x => x.TipoMovimiento == "RECEPCION").ToList();
+                var entregasTx = txs.Where(x => x.TipoMovimiento == "ENTREGA").ToList();
+
+                var tanques = productoElement.Elements(Covol + "TANQUE").ToList();
+                if (tanques.Count > 0)
+                {
+                    var tanqueElement = tanques.First();
+                    tanqueElement.Add(
+                        CrearExistencias(fechaOperacion, inventario, resumen),
+                        CrearRecepcionesConCFDI(resumen, recepcionesTx, inventario),
+                        CrearEntregasVacias()
+                    );
+                }
+
+                var mangueras = productoElement.Descendants(Covol + "MANGUERA").ToList();
+                if (mangueras.Count > 0 && entregasTx.Count > 0)
+                {
+                    ProrratearEntregas(mangueras, entregasTx);
+                }
+            }
+            else
+            {
+                productoElement = new XElement(Covol + "PRODUCTO",
+                    new XElement(Covol + "ClaveProducto", producto.clave_producto ?? ""),
+                    new XElement(Covol + "ClaveSubProducto", producto.clave_subproducto ?? ""),
+                    new XElement(Covol + "MarcaComercial", producto.marca_comercial ?? "")
                 );
+
+                if (producto.octanaje is not null)
+                {
+                    productoElement.Add(
+                        new XElement(Covol + "Gasolina",
+                            new XElement(Covol + "ComposOctanajeGasolina", producto.octanaje),
+                            new XElement(Covol + "GasolinaConCombustibleNoFosil", producto.combustible_no_fosil ?? "No")
+                        )
+                    );
+                }
+
+                var tanqueElement = new XElement(Covol + "TANQUE",
+                    new XElement(Covol + "ClaveTanque", $"TQ-{productoLike}"),
+                    new XElement(Covol + "LocalizacionYODescripcionTanque", $"Tanque {productoLike}"),
+                    new XElement(Covol + "VigenciaCalibracionTanque", $"{fechaOperacion.Year}-12-31"),
+                    new XElement(Covol + "CapacidadTotalTanque",
+                        new XElement(Covol + "ValorNumerico", 0),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "CapacidadOperativaTanque",
+                        new XElement(Covol + "ValorNumerico", 0),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "CapacidadUtilTanque",
+                        new XElement(Covol + "ValorNumerico", 0),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "FondajeTanque",
+                        new XElement(Covol + "ValorNumerico", 0),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "VolumenMinimoOperacion",
+                        new XElement(Covol + "ValorNumerico", 0),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "EstadoTanque", "O"),
+                    new XElement(Covol + "MedicionTanque",
+                        new XElement(Covol + "SistemaMedicionTanque", "SMT"),
+                        new XElement(Covol + "LocalizODescripSistMedicionTanque", $"Medición {productoLike}"),
+                        new XElement(Covol + "VigenciaCalibracionSistMedicionTanque", $"{fechaOperacion.Year}-12-31"),
+                        new XElement(Covol + "IncertidumbreMedicionSistMedicionTanque", 0.010)
+                    ),
+                    CrearExistencias(fechaOperacion, inventario, resumen),
+                    CrearRecepcionesVacias(resumen),
+                    CrearEntregasVacias()
+                );
+
+                productoElement.Add(tanqueElement);
             }
 
-            var tanqueElement = new XElement(Covol + "TANQUE",
-                new XElement(Covol + "ClaveTanque", $"TQ-{productoLike}"),
-                new XElement(Covol + "LocalizacionYODescripcionTanque", $"Tanque {productoLike}"),
-                new XElement(Covol + "VigenciaCalibracionTanque", $"{fechaOperacion.Year}-12-31"),
-                new XElement(Covol + "CapacidadTotalTanque",
-                    new XElement(Covol + "ValorNumerico", 0),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "CapacidadOperativaTanque",
-                    new XElement(Covol + "ValorNumerico", 0),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "CapacidadUtilTanque",
-                    new XElement(Covol + "ValorNumerico", 0),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "FondajeTanque",
-                    new XElement(Covol + "ValorNumerico", 0),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "VolumenMinimoOperacion",
-                    new XElement(Covol + "ValorNumerico", 0),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "EstadoTanque", "O"),
-                new XElement(Covol + "MedicionTanque",
-                    new XElement(Covol + "SistemaMedicionTanque", "SMT"),
-                    new XElement(Covol + "LocalizODescripSistMedicionTanque", $"Medición {productoLike}"),
-                    new XElement(Covol + "VigenciaCalibracionSistMedicionTanque", $"{fechaOperacion.Year}-12-31"),
-                    new XElement(Covol + "IncertidumbreMedicionSistMedicionTanque", 0.010)
-                ),
-                CrearExistencias(fechaOperacion, inventario, resumen),
-                CrearRecepciones(resumen),
-                CrearEntregas(resumen)
-            );
-
-            productoElement.Add(tanqueElement);
             root.Add(productoElement);
         }
 
@@ -326,7 +402,7 @@ public sealed class CovolDailyXmlExporter
         );
     }
 
-    private static XElement CrearRecepciones(dynamic? resumen)
+    private static XElement CrearRecepcionesVacias(dynamic? resumen)
     {
         return new XElement(Covol + "RECEPCIONES",
             new XElement(Covol + "TotalRecepciones", resumen?.total_recepciones ?? 0),
@@ -337,15 +413,128 @@ public sealed class CovolDailyXmlExporter
         );
     }
 
-    private static XElement CrearEntregas(dynamic? resumen)
+    private static XElement CrearEntregasVacias()
     {
         return new XElement(Covol + "ENTREGAS",
-            new XElement(Covol + "TotalEntregas", resumen?.total_entregas ?? 0),
+            new XElement(Covol + "TotalEntregas", 0),
             new XElement(Covol + "SumaVolumenEntregado",
-                new XElement(Covol + "ValorNumerico", resumen?.volumen_entrega ?? 0),
+                new XElement(Covol + "ValorNumerico", 0),
                 new XElement(Covol + "UM", "UM03")
-            )
+            ),
+            new XElement(Covol + "TotalDocumentos", 0)
         );
+    }
+
+    private static XElement CrearRecepcionesConCFDI(dynamic? resumen, List<CovolTransaction> txs, dynamic? inventario)
+    {
+        var root = new XElement(Covol + "RECEPCIONES",
+            new XElement(Covol + "TotalRecepciones", txs.Count),
+            new XElement(Covol + "SumaVolumenRecepcion",
+                new XElement(Covol + "ValorNumerico", txs.Sum(x => x.Volumen ?? 0)),
+                new XElement(Covol + "UM", "UM03")
+            ),
+            new XElement(Covol + "TotalDocumentos", txs.Count)
+        );
+
+        decimal volBase = inventario?.volumen_existencias_anterior ?? 0m;
+        int i = 1;
+
+        foreach (var t in txs)
+        {
+            var vol = t.Volumen ?? 0;
+            var recepcionElement = new XElement(Covol + "RECEPCION",
+                new XElement(Covol + "NumeroDeRegistro", i++),
+                new XElement(Covol + "VolumenInicialTanque",
+                    new XElement(Covol + "ValorNumerico", volBase),
+                    new XElement(Covol + "UM", "UM03")
+                ),
+                new XElement(Covol + "VolumenFinalTanque",
+                    new XElement(Covol + "ValorNumerico", volBase + vol)
+                ),
+                new XElement(Covol + "VolumenRecepcion",
+                    new XElement(Covol + "ValorNumerico", vol),
+                    new XElement(Covol + "UM", "UM03")
+                ),
+                new XElement(Covol + "Temperatura", 20.000),
+                new XElement(Covol + "PresionAbsoluta", 101.325),
+                new XElement(Covol + "FechaYHoraInicioRecepcion", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
+                new XElement(Covol + "FechaYHoraFinalRecepcion", $"{t.FechaTransaccion.AddMinutes(5):yyyy-MM-ddTHH:mm:sszzz}")
+            );
+            root.Add(recepcionElement);
+            volBase += vol;
+        }
+
+        return root;
+    }
+
+    private static void ProrratearEntregas(List<XElement> mangueras, List<CovolTransaction> entregas)
+    {
+        // Round robin a mangueras
+        var groups = entregas
+            .Select((x, i) => new { Tx = x, Index = i % mangueras.Count })
+            .GroupBy(x => x.Index)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Tx).ToList());
+
+        for (int i = 0; i < mangueras.Count; i++)
+        {
+            var txs = groups.ContainsKey(i) ? groups[i] : new List<CovolTransaction>();
+            
+            var entregasRoot = new XElement(Covol + "ENTREGAS",
+                new XElement(Covol + "TotalEntregas", txs.Count),
+                new XElement(Covol + "SumaVolumenEntregado",
+                    new XElement(Covol + "ValorNumerico", txs.Sum(x => x.Volumen ?? 0)),
+                    new XElement(Covol + "UM", "UM03")
+                ),
+                new XElement(Covol + "TotalDocumentos", txs.Count)
+            );
+
+            int numRegistro = 1;
+            decimal volAcumulado = 0m;
+
+            foreach (var t in txs)
+            {
+                var vol = t.Volumen ?? 0;
+                volAcumulado += vol;
+
+                var entregaElem = new XElement(Covol + "ENTREGA",
+                    new XElement(Covol + "NumeroDeRegistro", numRegistro++),
+                    new XElement(Covol + "TipoDeRegistro", "D"),
+                    new XElement(Covol + "VolumenEntregadoTotalizadorAcum",
+                        new XElement(Covol + "ValorNumerico", volAcumulado),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "VolumenEntregadoTotalizadorInsta",
+                        new XElement(Covol + "ValorNumerico", vol),
+                        new XElement(Covol + "UM", "UM03")
+                    ),
+                    new XElement(Covol + "FechaYHoraEntrega", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
+                    new XElement(Covol + "Complemento",
+                        new XElement(Covol + "Complemento_Expendio",
+                            new XElement(Exp + "NACIONAL",
+                                new XElement(Exp + "RfcClienteOProveedor", t.RfcClienteProveedor ?? ""),
+                                new XElement(Exp + "NombreClienteOProveedor", t.NombreClienteProveedor ?? ""),
+                                new XElement(Exp + "PermisoProveedor", t.PermisoProveedor ?? ""),
+                                new XElement(Exp + "CFDIs",
+                                    new XElement(Exp + "CFDI", t.Cfdi?.ToString().ToUpper() ?? ""),
+                                    new XElement(Exp + "TipoCFDI", t.TipoCfdi ?? "Ingreso"),
+                                    new XElement(Exp + "PrecioCompra", t.PrecioCompra ?? 0),
+                                    new XElement(Exp + "PrecioDeVentaAlPublico", t.PrecioVentaPublico ?? 0),
+                                    new XElement(Exp + "PrecioVenta", t.PrecioVenta ?? 0),
+                                    new XElement(Exp + "FechaYHoraTransaccion", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
+                                    new XElement(Exp + "VolumenDocumentado",
+                                        new XElement(Exp + "ValorNumerico", vol),
+                                        new XElement(Exp + "UM", "UM03")
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+                entregasRoot.Add(entregaElem);
+            }
+
+            mangueras[i].Add(entregasRoot);
+        }
     }
 
     private static string ResolverProductoLike(string? marca)

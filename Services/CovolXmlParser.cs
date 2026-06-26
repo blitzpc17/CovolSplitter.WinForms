@@ -79,9 +79,19 @@ namespace CovolSplitter.WinForms.Services
                 products.Add(product);
 
                 if (isMonthly)
+                {
                     ParseMonthlyProduct(cv, xp, product, txs);
+                }
                 else
+                {
                     ParseDailyProduct(cv, xp, product, txs);
+
+                    var xpClone = new XElement(xp);
+                    xpClone.Descendants(cv + "EXISTENCIAS").Remove();
+                    xpClone.Descendants(cv + "RECEPCIONES").Remove();
+                    xpClone.Descendants(cv + "ENTREGAS").Remove();
+                    product.XmlProductoBase = xpClone.ToString(SaveOptions.DisableFormatting);
+                }
 
                 progress?.Report(new CovolImportProgress
                 {

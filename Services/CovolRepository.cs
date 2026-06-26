@@ -1,4 +1,4 @@
-﻿using CovolSplitter.Winforms.Models;
+using CovolSplitter.Winforms.Models;
 using CovolSplitter.WinForms.Models;
 using Dapper;
 using Npgsql;
@@ -12,6 +12,33 @@ public sealed class CovolRepository
     public CovolRepository(string connectionString)
     {
         _connectionString = connectionString;
+    }
+
+    public async Task EnsureProductosXmlColumnAsync(CancellationToken ct = default)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync(ct);
+
+        var sql = @"
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'covol' AND table_name = 'productos'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT FROM information_schema.columns 
+                        WHERE table_schema = 'covol' 
+                          AND table_name = 'productos' 
+                          AND column_name = 'xml_producto_base'
+                    ) THEN
+                        ALTER TABLE covol.productos ADD COLUMN xml_producto_base TEXT;
+                    END IF;
+                END IF;
+            END
+            $$;
+        ";
+        await cn.ExecuteAsync(new CommandDefinition(sql, cancellationToken: ct));
     }
 
     public async Task<long> SavePackageAsync(
@@ -95,7 +122,8 @@ public sealed class CovolRepository
                         clave_subproducto,
                         marca_comercial,
                         octanaje,
-                        combustible_no_fosil
+                        combustible_no_fosil,
+                        xml_producto_base
                     )
                     VALUES
                     (
@@ -104,7 +132,8 @@ public sealed class CovolRepository
                         @ClaveSubProducto,
                         @MarcaComercial,
                         @Octanaje,
-                        @CombustibleNoFosil
+                        @CombustibleNoFosil,
+                        @XmlProductoBase
                     )
                     RETURNING id;",
                     p,
@@ -339,6 +368,12 @@ public sealed class CovolRepository
                 p.marca_comercial,
                 t.tipo_movimiento
             ORDER BY
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END,
                 p.marca_comercial,
                 t.tipo_movimiento;",
             new { anio, mes, rfc }
@@ -350,7 +385,7 @@ public sealed class CovolRepository
         await using var cn = new NpgsqlConnection(_connectionString);
 
         return await cn.QueryAsync<FilterOption>(@"
-            SELECT DISTINCT
+            SELECT
                 (
                     p.clave_producto || '|' ||
                     COALESCE(p.clave_subproducto, '') || '|' ||
@@ -369,7 +404,17 @@ public sealed class CovolRepository
             JOIN covol.productos p ON p.id = t.producto_id
             WHERE t.anio = @anio
               AND t.mes = @mes
-            ORDER BY ""Text"";",
+            GROUP BY
+                p.clave_producto,
+                p.clave_subproducto,
+                p.marca_comercial
+            ORDER BY
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END, ""Text"";",
             new { anio, mes }
         );
     }
@@ -505,6 +550,12 @@ public sealed class CovolRepository
               )
             ORDER BY
                 t.fecha_transaccion,
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END,
                 p.marca_comercial,
                 t.tipo_movimiento;",
             new
@@ -579,7 +630,13 @@ public sealed class CovolRepository
             WHERE t.archivo_id = @archivoId
               AND t.fecha_operacion = @fechaOperacion
               AND (@tipoMovimiento IS NULL OR t.tipo_movimiento = @tipoMovimiento)
-            ORDER BY t.fecha_transaccion, p.marca_comercial;",
+            ORDER BY t.fecha_transaccion, 
+                CASE 
+                    WHEN p.marca_comercial ILIKE '%MAGNA%' THEN 1
+                    WHEN p.marca_comercial ILIKE '%PREMIUM%' THEN 2
+                    WHEN p.marca_comercial ILIKE '%DIESEL%' THEN 3
+                    ELSE 4
+                END, p.marca_comercial;",
             new
             {
                 archivoId,

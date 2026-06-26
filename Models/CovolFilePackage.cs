@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -42,6 +42,7 @@ namespace CovolSplitter.WinForms.Models
         public string? MarcaComercial { get; set; }
         public int? Octanaje { get; set; }
         public string? CombustibleNoFosil { get; set; }
+        public string? XmlProductoBase { get; set; }
     }
 
     public sealed class CovolTransaction
