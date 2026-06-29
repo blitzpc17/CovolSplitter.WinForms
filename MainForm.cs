@@ -73,7 +73,7 @@ public partial class MainForm : Form
             }
 
             var covolRepo = new CovolRepository(cn);
-            await covolRepo.EnsureProductosXmlColumnAsync();
+            await covolRepo.EnsureSchemaUpdatesAsync();
 
             _connectionString = cn;
 

@@ -40,7 +40,12 @@ public sealed class CovolDailyXmlExporter
                 a.rfc_representante_legal,
                 a.rfc_proveedor,
                 a.clave_instalacion,
-                a.descripcion_instalacion
+                a.descripcion_instalacion,
+                a.numero_pozos,
+                a.numero_tanques,
+                a.numero_ductos_entrada_salida,
+                a.numero_ductos_transporte_distribucion,
+                a.numero_dispensarios
             FROM covol.archivos a
             WHERE a.anio = @anio
               AND a.mes = @mes
@@ -132,11 +137,11 @@ public sealed class CovolDailyXmlExporter
             ),
             new XElement(Covol + "ClaveInstalacion", header.clave_instalacion ?? ""),
             new XElement(Covol + "DescripcionInstalacion", header.descripcion_instalacion ?? ""),
-            new XElement(Covol + "NumeroPozos", 0),
-            new XElement(Covol + "NumeroTanques", 3),
-            new XElement(Covol + "NumeroDuctosEntradaSalida", 0),
-            new XElement(Covol + "NumeroDuctosTransporteDistribucion", 0),
-            new XElement(Covol + "NumeroDispensarios", 4),
+            new XElement(Covol + "NumeroPozos", header.numero_pozos ?? 0),
+            new XElement(Covol + "NumeroTanques", header.numero_tanques ?? 3),
+            new XElement(Covol + "NumeroDuctosEntradaSalida", header.numero_ductos_entrada_salida ?? 0),
+            new XElement(Covol + "NumeroDuctosTransporteDistribucion", header.numero_ductos_transporte_distribucion ?? 0),
+            new XElement(Covol + "NumeroDispensarios", header.numero_dispensarios ?? 4),
             new XElement(Covol + "FechaYHoraCorte", $"{fechaOperacion:yyyy-MM-dd}T23:59:59-06:00")
         );
 

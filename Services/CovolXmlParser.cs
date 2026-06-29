@@ -42,6 +42,11 @@ namespace CovolSplitter.WinForms.Services
                 RfcProveedor = V(root, cv + "RfcProveedor"),
                 ClaveInstalacion = V(root, cv + "ClaveInstalacion") ?? "",
                 DescripcionInstalacion = V(root, cv + "DescripcionInstalacion"),
+                NumeroPozos = ParseInt(V(root, cv + "NumeroPozos")) ?? 0,
+                NumeroTanques = ParseInt(V(root, cv + "NumeroTanques")) ?? 0,
+                NumeroDuctosEntradaSalida = ParseInt(V(root, cv + "NumeroDuctosEntradaSalida")) ?? 0,
+                NumeroDuctosTransporteDistribucion = ParseInt(V(root, cv + "NumeroDuctosTransporteDistribucion")) ?? 0,
+                NumeroDispensarios = ParseInt(V(root, cv + "NumeroDispensarios")) ?? 0,
 
                 // PostgreSQL TIMESTAMPTZ con Npgsql requiere UTC.
                 FechaReporte = fechaReporte?.ToUniversalTime()

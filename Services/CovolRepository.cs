@@ -14,7 +14,7 @@ public sealed class CovolRepository
         _connectionString = connectionString;
     }
 
-    public async Task EnsureProductosXmlColumnAsync(CancellationToken ct = default)
+    public async Task EnsureSchemaUpdatesAsync(CancellationToken ct = default)
     {
         await using var cn = new NpgsqlConnection(_connectionString);
         await cn.OpenAsync(ct);
@@ -34,6 +34,17 @@ public sealed class CovolRepository
                     ) THEN
                         ALTER TABLE covol.productos ADD COLUMN xml_producto_base TEXT;
                     END IF;
+                END IF;
+
+                IF EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'covol' AND table_name = 'archivos'
+                ) THEN
+                    ALTER TABLE covol.archivos ADD COLUMN IF NOT EXISTS numero_pozos INT DEFAULT 0;
+                    ALTER TABLE covol.archivos ADD COLUMN IF NOT EXISTS numero_tanques INT DEFAULT 0;
+                    ALTER TABLE covol.archivos ADD COLUMN IF NOT EXISTS numero_ductos_entrada_salida INT DEFAULT 0;
+                    ALTER TABLE covol.archivos ADD COLUMN IF NOT EXISTS numero_ductos_transporte_distribucion INT DEFAULT 0;
+                    ALTER TABLE covol.archivos ADD COLUMN IF NOT EXISTS numero_dispensarios INT DEFAULT 0;
                 END IF;
             END
             $$;
@@ -68,6 +79,11 @@ public sealed class CovolRepository
                     rfc_proveedor,
                     clave_instalacion,
                     descripcion_instalacion,
+                    numero_pozos,
+                    numero_tanques,
+                    numero_ductos_entrada_salida,
+                    numero_ductos_transporte_distribucion,
+                    numero_dispensarios,
                     fecha_reporte,
                     fecha_operacion,
                     anio,
@@ -91,6 +107,11 @@ public sealed class CovolRepository
                     @RfcProveedor,
                     @ClaveInstalacion,
                     @DescripcionInstalacion,
+                    @NumeroPozos,
+                    @NumeroTanques,
+                    @NumeroDuctosEntradaSalida,
+                    @NumeroDuctosTransporteDistribucion,
+                    @NumeroDispensarios,
                     @FechaReporte,
                     @FechaOperacion,
                     @Anio,

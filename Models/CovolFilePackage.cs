@@ -20,6 +20,11 @@ namespace CovolSplitter.WinForms.Models
         public string? RfcProveedor { get; set; }
         public string ClaveInstalacion { get; set; } = "";
         public string? DescripcionInstalacion { get; set; }
+        public int NumeroPozos { get; set; }
+        public int NumeroTanques { get; set; }
+        public int NumeroDuctosEntradaSalida { get; set; }
+        public int NumeroDuctosTransporteDistribucion { get; set; }
+        public int NumeroDispensarios { get; set; }
         public DateTimeOffset? FechaReporte { get; set; }
         public DateTime? FechaOperacion { get; set; }
         public short Anio { get; set; }
