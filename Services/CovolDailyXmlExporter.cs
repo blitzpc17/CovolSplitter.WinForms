@@ -261,8 +261,7 @@ public sealed class CovolDailyXmlExporter
             {
                 productoElement = new XElement(Covol + "PRODUCTO",
                     new XElement(Covol + "ClaveProducto", producto.clave_producto ?? ""),
-                    new XElement(Covol + "ClaveSubProducto", producto.clave_subproducto ?? ""),
-                    new XElement(Covol + "MarcaComercial", producto.marca_comercial ?? "")
+                    new XElement(Covol + "ClaveSubProducto", producto.clave_subproducto ?? "")
                 );
 
                 if (producto.octanaje is not null)
@@ -274,6 +273,8 @@ public sealed class CovolDailyXmlExporter
                         )
                     );
                 }
+
+                productoElement.Add(new XElement(Covol + "MarcaComercial", producto.marca_comercial ?? ""));
 
                 var tanqueElement = new XElement(Covol + "TANQUE",
                     new XElement(Covol + "ClaveTanque", $"TQ-{productoLike}"),

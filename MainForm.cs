@@ -29,9 +29,101 @@ public partial class MainForm : Form
     private bool _cargandoFechaDesdeCodigo;
     private bool _cargandoFiltrosAutomaticos;
 
+    private ContextMenuStrip _gridContextMenu = null!;
+
     public MainForm()
     {
         InitializeComponent();
+        ConfigurarMenuContextual();
+    }
+
+    private void ConfigurarMenuContextual()
+    {
+        _gridContextMenu = new ContextMenuStrip();
+        
+        var menuEliminar = new ToolStripMenuItem("Eliminar archivo seleccionado");
+        menuEliminar.Click += MenuEliminar_Click;
+        _gridContextMenu.Items.Add(menuEliminar);
+
+        _gridContextMenu.Opening += (s, e) =>
+        {
+            if (_consultaGridMode != ConsultaGridMode.Archivos || dgvConsulta.SelectedRows.Count == 0)
+                e.Cancel = true;
+        };
+
+        dgvConsulta.ContextMenuStrip = _gridContextMenu;
+        dgvConsulta.MouseDown += dgvConsulta_MouseDown;
+    }
+
+    private void dgvConsulta_MouseDown(object? sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Right)
+        {
+            var hit = dgvConsulta.HitTest(e.X, e.Y);
+            if (hit.Type == DataGridViewHitTestType.Cell && hit.RowIndex >= 0)
+            {
+                dgvConsulta.ClearSelection();
+                dgvConsulta.Rows[hit.RowIndex].Selected = true;
+            }
+        }
+    }
+
+    private async void MenuEliminar_Click(object? sender, EventArgs e)
+    {
+        if (_consultaGridMode != ConsultaGridMode.Archivos)
+            return;
+
+        if (dgvConsulta.SelectedRows.Count == 0)
+            return;
+
+        var row = dgvConsulta.SelectedRows[0];
+        
+        if (row.Cells["id"].Value is not long id)
+        {
+            // Try parse just in case
+            if (row.Cells["id"].Value == null || !long.TryParse(row.Cells["id"].Value.ToString(), out id))
+                return;
+        }
+
+        var nombre = row.Cells["nombre_archivo"].Value?.ToString();
+
+        var confirmResult = MessageBox.Show(
+            this,
+            $"¿Estás seguro de que deseas eliminar el archivo {nombre}?\n\nEsto también eliminará todas las transacciones y productos asociados a este archivo.",
+            "Confirmar eliminación",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning
+        );
+
+        if (confirmResult != DialogResult.Yes)
+            return;
+
+        try
+        {
+            var repo = new CovolRepository(_connectionString!);
+            await repo.DeleteArchivoAsync(id);
+
+            MessageBox.Show(
+                this,
+                "Archivo eliminado correctamente.",
+                "Eliminado",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+
+            // Refrescar el grid
+            btnConsultarArchivos_Click(btnConsultarArchivos, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Error al eliminar el archivo:\n{ex.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
     }
 
     private async void MainForm_Load(object sender, EventArgs e)
