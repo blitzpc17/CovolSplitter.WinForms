@@ -373,7 +373,7 @@ public sealed class CovolDailyXmlExporter
         await using var cn = new NpgsqlConnection(_connectionString);
         await cn.OpenAsync(ct);
 
-        var fechas = (await cn.QueryAsync<DateTime>(new CommandDefinition(@"
+        var fechas = (await cn.QueryAsync<DateOnly>(new CommandDefinition(@"
             SELECT DISTINCT fecha_operacion::date
             FROM covol.transacciones
             WHERE anio = @anio
@@ -381,7 +381,7 @@ public sealed class CovolDailyXmlExporter
             ORDER BY fecha_operacion::date;",
             new { anio, mes },
             cancellationToken: ct
-        ))).Select(DateOnly.FromDateTime).ToList();
+        ))).ToList();
 
         var total = 0;
 
