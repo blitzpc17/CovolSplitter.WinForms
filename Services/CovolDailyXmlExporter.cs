@@ -187,7 +187,7 @@ public sealed class CovolDailyXmlExporter
                 JOIN covol.productos p ON p.id = t.producto_id
                 WHERE t.anio = @anio
                   AND t.mes = @mes
-                  AND t.fecha_operacion = @fechaOperacion
+                  AND t.fecha_operacion::date = @fechaOperacion::date
                   AND p.marca_comercial ILIKE '%' || @productoLike || '%';",
                 new
                 {
@@ -218,7 +218,7 @@ public sealed class CovolDailyXmlExporter
                 JOIN covol.productos p ON p.id = t.producto_id
                 WHERE t.anio = @anio
                   AND t.mes = @mes
-                  AND t.fecha_operacion = @fechaOperacion
+                  AND t.fecha_operacion::date = @fechaOperacion::date
                   AND p.marca_comercial ILIKE '%' || @productoLike || '%';",
                 new
                 {
@@ -233,6 +233,8 @@ public sealed class CovolDailyXmlExporter
             string? xmlBase = producto.xml_producto_base;
             XElement productoElement;
 
+            string logPath = Path.Combine(outputFolder, "log_generacion_diarios.txt");
+
             if (!string.IsNullOrWhiteSpace(xmlBase))
             {
                 productoElement = XElement.Parse(xmlBase);
@@ -241,6 +243,10 @@ public sealed class CovolDailyXmlExporter
                 var entregasTx = txs.Where(x => x.TipoMovimiento == "ENTREGA").ToList();
 
                 var tanques = productoElement.Elements(Covol + "TANQUE").ToList();
+                var mangueras = productoElement.Descendants(Covol + "MANGUERA").ToList();
+
+                File.AppendAllText(logPath, $"[{fechaOperacion:yyyy-MM-dd}] Producto: {productoLike} | Base XML Encontrado | Entregas en BD: {entregasTx.Count} | Mangueras en XML: {mangueras.Count}\n");
+
                 if (tanques.Count > 0)
                 {
                     var tanqueElement = tanques.First();
@@ -251,14 +257,24 @@ public sealed class CovolDailyXmlExporter
                     );
                 }
 
-                var mangueras = productoElement.Descendants(Covol + "MANGUERA").ToList();
                 if (mangueras.Count > 0 && entregasTx.Count > 0)
                 {
                     ProrratearEntregas(mangueras, entregasTx);
                 }
+                else if (entregasTx.Count > 0 && mangueras.Count == 0)
+                {
+                    File.AppendAllText(logPath, $"   => ¡ALERTA! Hay {entregasTx.Count} entregas de {productoLike} pero el archivo base no tiene MANGUERAS. Las entregas no se guardarán.\n");
+                }
             }
             else
             {
+                var entregasTx = txs.Where(x => x.TipoMovimiento == "ENTREGA").ToList();
+                File.AppendAllText(logPath, $"[{fechaOperacion:yyyy-MM-dd}] Producto: {productoLike} | NO hay XML Base | Entregas en BD: {entregasTx.Count} | Mangueras: 0\n");
+                if (entregasTx.Count > 0)
+                {
+                     File.AppendAllText(logPath, $"   => ¡ALERTA! Hay {entregasTx.Count} entregas de {productoLike} pero no hay XML base. Las entregas no se guardarán.\n");
+                }
+
                 productoElement = new XElement(Covol + "PRODUCTO",
                     new XElement(Covol + "ClaveProducto", producto.clave_producto ?? ""),
                     new XElement(Covol + "ClaveSubProducto", producto.clave_subproducto ?? "")
@@ -358,11 +374,11 @@ public sealed class CovolDailyXmlExporter
         await cn.OpenAsync(ct);
 
         var fechas = (await cn.QueryAsync<DateTime>(new CommandDefinition(@"
-            SELECT DISTINCT fecha_operacion::timestamp
+            SELECT DISTINCT fecha_operacion::date
             FROM covol.transacciones
             WHERE anio = @anio
               AND mes = @mes
-            ORDER BY fecha_operacion;",
+            ORDER BY fecha_operacion::date;",
             new { anio, mes },
             cancellationToken: ct
         ))).Select(DateOnly.FromDateTime).ToList();

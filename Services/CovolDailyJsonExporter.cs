@@ -206,7 +206,7 @@ public sealed class CovolDailyJsonExporter
             JOIN covol.productos p ON p.id = t.producto_id
             WHERE t.anio = @anio
               AND t.mes = @mes
-              AND t.fecha_operacion = @fechaOperacion
+              AND t.fecha_operacion::date = @fechaOperacion::date
               AND (
                     @filtrarProductos = FALSE
                     OR (
