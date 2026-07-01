@@ -101,9 +101,9 @@ public sealed class CovolDailyJsonExporter
         await using var cn = new NpgsqlConnection(_connectionString);
         await cn.OpenAsync(ct);
 
-        var rows = await cn.QueryAsync<DateOnly>(new CommandDefinition(@"
+        var rows = await cn.QueryAsync<DateTime>(new CommandDefinition(@"
             SELECT DISTINCT
-                t.fecha_operacion::date
+                CAST(t.fecha_operacion::date AS timestamp)
             FROM covol.transacciones t
             JOIN covol.productos p ON p.id = t.producto_id
             WHERE t.anio = @anio
@@ -120,7 +120,7 @@ public sealed class CovolDailyJsonExporter
                     @filtrarMovimientos = FALSE
                     OR t.tipo_movimiento = ANY(@tiposMovimiento)
               )
-            ORDER BY t.fecha_operacion::date;",
+            ORDER BY CAST(t.fecha_operacion::date AS timestamp);",
             new
             {
                 anio,
@@ -133,7 +133,7 @@ public sealed class CovolDailyJsonExporter
             cancellationToken: ct
         ));
 
-        return rows.ToList();
+        return rows.Select(DateOnly.FromDateTime).ToList();
     }
 
     private async Task<object> BuildDailyJsonObjectAsync(

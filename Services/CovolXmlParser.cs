@@ -90,13 +90,14 @@ namespace CovolSplitter.WinForms.Services
                 else
                 {
                     ParseDailyProduct(cv, xp, product, txs);
-
-                    var xpClone = new XElement(xp);
-                    xpClone.Descendants(cv + "EXISTENCIAS").Remove();
-                    xpClone.Descendants(cv + "RECEPCIONES").Remove();
-                    xpClone.Descendants(cv + "ENTREGAS").Remove();
-                    product.XmlProductoBase = xpClone.ToString(SaveOptions.DisableFormatting);
                 }
+
+                var xpClone = new XElement(xp);
+                xpClone.Descendants(cv + "EXISTENCIAS").Remove();
+                xpClone.Descendants(cv + "RECEPCIONES").Remove();
+                xpClone.Descendants(cv + "ENTREGAS").Remove();
+                xpClone.Descendants(cv + "REPORTEDEVOLUMENMENSUAL").Remove();
+                product.XmlProductoBase = xpClone.ToString(SaveOptions.DisableFormatting);
 
                 progress?.Report(new CovolImportProgress
                 {

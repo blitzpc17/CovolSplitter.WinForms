@@ -257,13 +257,31 @@ public sealed class CovolDailyXmlExporter
                     );
                 }
 
+                if (mangueras.Count == 0 && entregasTx.Count > 0)
+                {
+                    File.AppendAllText(logPath, $"   => ¡NOTA! Creando Manguera genérica porque el archivo base no tiene MANGUERAS.\n");
+
+                    var mangueraGen = new XElement(Covol + "MANGUERA",
+                        new XElement(Covol + "IdentificadorManguera", $"MG-GEN"),
+                        new XElement(Covol + "MedidorManguera",
+                            new XElement(Covol + "SistemaMedicionManguera", "SMM"),
+                            new XElement(Covol + "VigenciaCalibracionSistMedicionManguera", $"{fechaOperacion.Year}-12-31"),
+                            new XElement(Covol + "IncertidumbreMedicionSistMedicionManguera", 0.010)
+                        )
+                    );
+
+                    var dispensarioGen = new XElement(Covol + "DISPENSARIO",
+                        new XElement(Covol + "ClaveDispensario", $"DISP-GEN"),
+                        mangueraGen
+                    );
+
+                    productoElement.Add(dispensarioGen);
+                    mangueras.Add(mangueraGen);
+                }
+
                 if (mangueras.Count > 0 && entregasTx.Count > 0)
                 {
                     ProrratearEntregas(mangueras, entregasTx);
-                }
-                else if (entregasTx.Count > 0 && mangueras.Count == 0)
-                {
-                    File.AppendAllText(logPath, $"   => ¡ALERTA! Hay {entregasTx.Count} entregas de {productoLike} pero el archivo base no tiene MANGUERAS. Las entregas no se guardarán.\n");
                 }
             }
             else
@@ -272,7 +290,7 @@ public sealed class CovolDailyXmlExporter
                 File.AppendAllText(logPath, $"[{fechaOperacion:yyyy-MM-dd}] Producto: {productoLike} | NO hay XML Base | Entregas en BD: {entregasTx.Count} | Mangueras: 0\n");
                 if (entregasTx.Count > 0)
                 {
-                     File.AppendAllText(logPath, $"   => ¡ALERTA! Hay {entregasTx.Count} entregas de {productoLike} pero no hay XML base. Las entregas no se guardarán.\n");
+                     File.AppendAllText(logPath, $"   => ¡NOTA! Creando Manguera genérica porque no hay XML base.\n");
                 }
 
                 productoElement = new XElement(Covol + "PRODUCTO",
@@ -329,6 +347,26 @@ public sealed class CovolDailyXmlExporter
                 );
 
                 productoElement.Add(tanqueElement);
+
+                if (entregasTx.Count > 0)
+                {
+                    var mangueraGen = new XElement(Covol + "MANGUERA",
+                        new XElement(Covol + "IdentificadorManguera", $"MG-GEN"),
+                        new XElement(Covol + "MedidorManguera",
+                            new XElement(Covol + "SistemaMedicionManguera", "SMM"),
+                            new XElement(Covol + "VigenciaCalibracionSistMedicionManguera", $"{fechaOperacion.Year}-12-31"),
+                            new XElement(Covol + "IncertidumbreMedicionSistMedicionManguera", 0.010)
+                        )
+                    );
+
+                    var dispensarioGen = new XElement(Covol + "DISPENSARIO",
+                        new XElement(Covol + "ClaveDispensario", $"DISP-GEN"),
+                        mangueraGen
+                    );
+
+                    productoElement.Add(dispensarioGen);
+                    ProrratearEntregas(new List<XElement> { mangueraGen }, entregasTx);
+                }
             }
 
             root.Add(productoElement);
@@ -373,15 +411,15 @@ public sealed class CovolDailyXmlExporter
         await using var cn = new NpgsqlConnection(_connectionString);
         await cn.OpenAsync(ct);
 
-        var fechas = (await cn.QueryAsync<DateOnly>(new CommandDefinition(@"
-            SELECT DISTINCT fecha_operacion::date
+        var fechas = (await cn.QueryAsync<DateTime>(new CommandDefinition(@"
+            SELECT DISTINCT CAST(fecha_operacion::date AS timestamp)
             FROM covol.transacciones
             WHERE anio = @anio
               AND mes = @mes
-            ORDER BY fecha_operacion::date;",
+            ORDER BY CAST(fecha_operacion::date AS timestamp);",
             new { anio, mes },
             cancellationToken: ct
-        ))).ToList();
+        ))).Select(DateOnly.FromDateTime).ToList();
 
         var total = 0;
 
