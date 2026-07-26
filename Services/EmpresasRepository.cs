@@ -91,4 +91,73 @@ public sealed class EmpresasRepository
             ", new { empresaId, producto, xmlTanque });
         }
     }
+
+    public async Task<int> ActualizarFechasCalibracionMasivaAsync(DateOnly nuevaFecha)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync();
+
+        var tanques = await cn.QueryAsync<dynamic>(@"SELECT id, xml_tanque FROM covol.empresa_tanques WHERE xml_tanque IS NOT NULL AND xml_tanque != ''");
+        int updatedCount = 0;
+        System.Xml.Linq.XNamespace covol = "https://www.sat.gob.mx/esquemas/ControlesVolumetricos";
+        System.Xml.Linq.XNamespace covolAlterno = "https://www.sat.gob.mx/ControlesVolumetricos";
+
+        foreach (var tanque in tanques)
+        {
+            string xmlBase = tanque.xml_tanque;
+            bool changed = false;
+
+            try
+            {
+                string xmlString = xmlBase.Trim();
+                if (xmlString.StartsWith("<Covol:TANQUE") && !xmlString.Contains("</Covol:TANQUE>"))
+                    xmlString += "\n</Covol:TANQUE>";
+                else if (xmlString.StartsWith("<TANQUE") && !xmlString.Contains("</TANQUE>"))
+                    xmlString += "\n</TANQUE>";
+
+                string xmlToParse = $"<root xmlns:Covol=\"{covolAlterno}\">{xmlString}</root>";
+                var doc = System.Xml.Linq.XDocument.Parse(xmlToParse);
+                
+                // The actual TANQUE element is the first child of root
+                var nodoRaiz = doc.Elements().FirstOrDefault();
+                if (nodoRaiz == null) continue;
+                
+                var tanqueElement = nodoRaiz.Elements().FirstOrDefault();
+                if (tanqueElement == null) continue;
+
+                var nodoVigenciaTanque = tanqueElement.Descendants(covol + "VigenciaCalibracionTanque").FirstOrDefault()
+                                      ?? tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionTanque").FirstOrDefault();
+                if (nodoVigenciaTanque != null)
+                {
+                    nodoVigenciaTanque.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    changed = true;
+                }
+
+                var nodoVigenciaSist = tanqueElement.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault()
+                                    ?? tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault();
+                if (nodoVigenciaSist != null)
+                {
+                    nodoVigenciaSist.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    string newXml = tanqueElement.ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
+                    await cn.ExecuteAsync(@"
+                        UPDATE covol.empresa_tanques 
+                        SET xml_tanque = @xml 
+                        WHERE id = @id;",
+                        new { xml = newXml, id = tanque.id }
+                    );
+                    updatedCount++;
+                }
+            }
+            catch
+            {
+                // Ignorar XML mal formado
+            }
+        }
+        return updatedCount;
+    }
 }

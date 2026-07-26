@@ -1187,7 +1187,7 @@ public partial class MainForm : Form
 
         var confirm = MessageBox.Show(
             this, 
-            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los XMLs base del mes {mes:00}/{anio}?", 
+            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los XMLs base del mes {mes:00}/{anio} y en los Tanques de las Empresas configuradas?", 
             "Confirmar modificación masiva", 
             MessageBoxButtons.YesNo, 
             MessageBoxIcon.Question
@@ -1203,9 +1203,12 @@ public partial class MainForm : Form
             var repo = new CovolRepository(_connectionString!);
             int updated = await repo.ActualizarCalibracionesMensualAsync(anio, mes, nuevaFecha);
 
+            var empRepo = new EmpresasRepository(_connectionString!);
+            int empUpdated = await empRepo.ActualizarFechasCalibracionMasivaAsync(nuevaFecha);
+
             MessageBox.Show(
                 this, 
-                $"Se actualizaron las fechas de calibración en {updated} plantillas. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
+                $"Se actualizaron las fechas de calibración en {updated} plantillas y en {empUpdated} configuraciones de tanques. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
                 "Actualización exitosa", 
                 MessageBoxButtons.OK, 
                 MessageBoxIcon.Information
