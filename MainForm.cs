@@ -167,6 +167,9 @@ public partial class MainForm : Form
             var covolRepo = new CovolRepository(cn);
             await covolRepo.EnsureSchemaUpdatesAsync();
 
+            var empresasRepo = new EmpresasRepository(cn);
+            await empresasRepo.InitTablesAsync();
+
             _connectionString = cn;
 
             HabilitarSistema();
@@ -175,6 +178,7 @@ public partial class MainForm : Form
             lblConfigEstado.ForeColor = Color.ForestGreen;
 
             await CargarFiltrosAutomaticosAsync();
+            await CargarComboboxEmpresasAsync();
         }
         catch
         {
@@ -703,7 +707,13 @@ public partial class MainForm : Form
         {
             btnGenerarXmlDiario.Enabled = false;
 
-            var exporter = new CovolDailyXmlExporter(_connectionString!);
+            int? empresaId = null;
+            if (cmbEmpresaTanques.SelectedValue is int eId && eId > 0)
+            {
+                empresaId = eId;
+            }
+
+            var exporter = new CovolDailyXmlExporter(_connectionString!, empresaId);
             var diasSeleccionados = ObtenerDiasXmlSeleccionados();
 
             if (chkGenerarTodoMes.Checked || diasSeleccionados.Length > 0)
@@ -1215,5 +1225,27 @@ public partial class MainForm : Form
         {
             btnActualizarCalibracion.Enabled = true;
         }
+    }
+    
+    private async Task CargarComboboxEmpresasAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_connectionString)) return;
+        var repo = new EmpresasRepository(_connectionString);
+        var empresas = await repo.GetAllEmpresasAsync();
+        empresas.Insert(0, new Empresa { Id = 0, Nombre = "(Ninguna)" });
+        cmbEmpresaTanques.DataSource = empresas;
+        cmbEmpresaTanques.DisplayMember = "Nombre";
+        cmbEmpresaTanques.ValueMember = "Id";
+    }
+    
+    private async void btnGestionarEmpresas_Click(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_connectionString)) return;
+        
+        var repo = new EmpresasRepository(_connectionString);
+        using var frm = new FrmEmpresasTanques(repo);
+        frm.ShowDialog(this);
+        
+        await CargarComboboxEmpresasAsync();
     }
 }

@@ -1,0 +1,94 @@
+using CovolSplitter.WinForms.Models;
+using Dapper;
+using Npgsql;
+
+namespace CovolSplitter.WinForms.Services;
+
+public sealed class EmpresasRepository
+{
+    private readonly string _connectionString;
+
+    public EmpresasRepository(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public async Task InitTablesAsync()
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.OpenAsync();
+
+        await cn.ExecuteAsync(@"
+            CREATE TABLE IF NOT EXISTS covol.empresas (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL UNIQUE
+            );
+
+            CREATE TABLE IF NOT EXISTS covol.empresa_tanques (
+                id SERIAL PRIMARY KEY,
+                empresa_id INT REFERENCES covol.empresas(id) ON DELETE CASCADE,
+                producto VARCHAR(50) NOT NULL,
+                xml_tanque TEXT NOT NULL,
+                UNIQUE (empresa_id, producto)
+            );
+        ");
+    }
+
+    public async Task<List<Empresa>> GetAllEmpresasAsync()
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        return (await cn.QueryAsync<Empresa>("SELECT id AS Id, nombre AS Nombre FROM covol.empresas ORDER BY nombre")).ToList();
+    }
+
+    public async Task<int> CreateEmpresaAsync(string nombre)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        return await cn.ExecuteScalarAsync<int>(
+            "INSERT INTO covol.empresas (nombre) VALUES (@nombre) RETURNING id;", 
+            new { nombre });
+    }
+
+    public async Task UpdateEmpresaAsync(int id, string nombre)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.ExecuteAsync(
+            "UPDATE covol.empresas SET nombre = @nombre WHERE id = @id;", 
+            new { id, nombre });
+    }
+
+    public async Task DeleteEmpresaAsync(int id)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        await cn.ExecuteAsync("DELETE FROM covol.empresas WHERE id = @id;", new { id });
+    }
+
+    public async Task<List<EmpresaTanque>> GetTanquesByEmpresaAsync(int empresaId)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        return (await cn.QueryAsync<EmpresaTanque>(
+            "SELECT id AS Id, empresa_id AS EmpresaId, producto AS Producto, xml_tanque AS XmlTanque FROM covol.empresa_tanques WHERE empresa_id = @empresaId", 
+            new { empresaId })).ToList();
+    }
+
+    public async Task SaveTanqueAsync(int empresaId, string producto, string xmlTanque)
+    {
+        await using var cn = new NpgsqlConnection(_connectionString);
+        
+        // Ensure not saving empty strings as empty records, only if there is content or to clear it
+        if (string.IsNullOrWhiteSpace(xmlTanque))
+        {
+            await cn.ExecuteAsync(@"
+                DELETE FROM covol.empresa_tanques WHERE empresa_id = @empresaId AND producto = @producto;
+            ", new { empresaId, producto });
+        }
+        else
+        {
+            await cn.ExecuteAsync(@"
+                INSERT INTO covol.empresa_tanques (empresa_id, producto, xml_tanque)
+                VALUES (@empresaId, @producto, @xmlTanque)
+                ON CONFLICT (empresa_id, producto) 
+                DO UPDATE SET xml_tanque = EXCLUDED.xml_tanque;
+            ", new { empresaId, producto, xmlTanque });
+        }
+    }
+}

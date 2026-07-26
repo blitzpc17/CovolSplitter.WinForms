@@ -96,6 +96,11 @@ partial class MainForm
         lblFechaCalibracion = new Label();
         dtpCalibracionMasiva = new DateTimePicker();
         btnActualizarCalibracion = new Button();
+        
+        lblEmpresaTanques = new Label();
+        cmbEmpresaTanques = new ComboBox();
+        btnGestionarEmpresas = new Button();
+
         tabExportacion = new TabPage();
         grpImportacion = new GroupBox();
         btnImportarMensual = new Button();
@@ -244,6 +249,8 @@ partial class MainForm
         grpFiltrosConsulta.Controls.Add(lblDiasXml);
         grpFiltrosConsulta.Controls.Add(checkedDiasXml);
         grpFiltrosConsulta.Controls.Add(lblConsultaConteo);
+        grpFiltrosConsulta.Controls.Add(lblEmpresaTanques);
+        grpFiltrosConsulta.Controls.Add(cmbEmpresaTanques);
         grpFiltrosConsulta.Location = new Point(18, 15);
         grpFiltrosConsulta.Margin = new Padding(3, 2, 3, 2);
         grpFiltrosConsulta.Name = "grpFiltrosConsulta";
@@ -378,8 +385,24 @@ partial class MainForm
         comboProductos.Location = new Point(16, 82);
         comboProductos.Margin = new Padding(3, 2, 3, 2);
         comboProductos.Name = "comboProductos";
-        comboProductos.Size = new Size(438, 24);
+        comboProductos.Size = new Size(295, 23);
         comboProductos.TabIndex = 9;
+        
+        // lblEmpresaTanques
+        lblEmpresaTanques.AutoSize = true;
+        lblEmpresaTanques.Location = new Point(16, 115);
+        lblEmpresaTanques.Name = "lblEmpresaTanques";
+        lblEmpresaTanques.Size = new Size(130, 15);
+        lblEmpresaTanques.TabIndex = 101;
+        lblEmpresaTanques.Text = "Empresa (Nodos Tanque)";
+        
+        // cmbEmpresaTanques
+        cmbEmpresaTanques.DropDownStyle = ComboBoxStyle.DropDownList;
+        cmbEmpresaTanques.FormattingEnabled = true;
+        cmbEmpresaTanques.Location = new Point(160, 112);
+        cmbEmpresaTanques.Name = "cmbEmpresaTanques";
+        cmbEmpresaTanques.Size = new Size(150, 23);
+        cmbEmpresaTanques.TabIndex = 102;
         // 
         // lblMovimientosConsulta
         // 
@@ -482,6 +505,7 @@ partial class MainForm
         grpModificacionMasiva.Controls.Add(lblFechaCalibracion);
         grpModificacionMasiva.Controls.Add(dtpCalibracionMasiva);
         grpModificacionMasiva.Controls.Add(btnActualizarCalibracion);
+        grpModificacionMasiva.Controls.Add(btnGestionarEmpresas);
         grpModificacionMasiva.Location = new Point(18, 212);
         grpModificacionMasiva.Margin = new Padding(3, 2, 3, 2);
         grpModificacionMasiva.Name = "grpModificacionMasiva";
@@ -489,6 +513,16 @@ partial class MainForm
         grpModificacionMasiva.TabIndex = 2;
         grpModificacionMasiva.TabStop = false;
         grpModificacionMasiva.Text = "Modificación Masiva de Calibraciones (Mes/Año)";
+        // 
+        // btnGestionarEmpresas
+        // 
+        btnGestionarEmpresas.Location = new Point(460, 24);
+        btnGestionarEmpresas.Name = "btnGestionarEmpresas";
+        btnGestionarEmpresas.Size = new Size(180, 26);
+        btnGestionarEmpresas.TabIndex = 3;
+        btnGestionarEmpresas.Text = "Gestionar Tanques/Empresas";
+        btnGestionarEmpresas.UseVisualStyleBackColor = true;
+        btnGestionarEmpresas.Click += btnGestionarEmpresas_Click;
         // 
         // lblFechaCalibracion
         // 
@@ -709,4 +743,7 @@ partial class MainForm
     private Label lblFechaCalibracion;
     private DateTimePicker dtpCalibracionMasiva;
     private Button btnActualizarCalibracion;
+    private Label lblEmpresaTanques;
+    private ComboBox cmbEmpresaTanques;
+    private Button btnGestionarEmpresas;
 }

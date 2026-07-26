@@ -8,14 +8,16 @@ namespace CovolSplitter.WinForms.Services;
 public sealed class CovolDailyXmlExporter
 {
     private readonly string _connectionString;
+    private readonly int? _empresaId;
 
     private static readonly XNamespace Covol = "https://www.sat.gob.mx/ControlesVolumetricos";
     private static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
     private static readonly XNamespace Exp = "Complemento_Expendio";
 
-    public CovolDailyXmlExporter(string connectionString)
+    public CovolDailyXmlExporter(string connectionString, int? empresaId = null)
     {
         _connectionString = connectionString;
+        _empresaId = empresaId;
     }
 
     public async Task<string> ExportDailyXmlAsync(
@@ -247,9 +249,56 @@ public sealed class CovolDailyXmlExporter
 
                 File.AppendAllText(logPath, $"[{fechaOperacion:yyyy-MM-dd}] Producto: {productoLike} | Base XML Encontrado | Entregas en BD: {entregasTx.Count} | Mangueras en XML: {mangueras.Count}\n");
 
-                if (tanques.Count > 0)
+                XElement? tanqueElement = null;
+
+                if (_empresaId.HasValue)
                 {
-                    var tanqueElement = tanques.First();
+                    var empresasRepo = new EmpresasRepository(_connectionString);
+                    var tanquesEmpresa = await empresasRepo.GetTanquesByEmpresaAsync(_empresaId.Value);
+                    var tanqueProd = tanquesEmpresa.FirstOrDefault(t => productoLike.Contains(t.Producto, StringComparison.OrdinalIgnoreCase) || t.Producto.Contains(productoLike, StringComparison.OrdinalIgnoreCase));
+                    if (tanqueProd != null && !string.IsNullOrWhiteSpace(tanqueProd.XmlTanque))
+                    {
+                        try
+                        {
+                            string xmlString = tanqueProd.XmlTanque.Trim();
+                            if (xmlString.StartsWith("<Covol:TANQUE") && !xmlString.Contains("</Covol:TANQUE>"))
+                            {
+                                xmlString += "\n</Covol:TANQUE>";
+                            }
+                            else if (xmlString.StartsWith("<TANQUE") && !xmlString.Contains("</TANQUE>"))
+                            {
+                                xmlString += "\n</TANQUE>";
+                            }
+
+                            string xmlToParse = $"<root xmlns:Covol=\"{Covol.NamespaceName}\">{xmlString}</root>";
+                            var tempRoot = XElement.Parse(xmlToParse);
+                            tanqueElement = tempRoot.Elements().FirstOrDefault();
+                            
+                            if (tanqueElement != null)
+                            {
+                                tanques.ForEach(t => t.Remove()); // Remove existing tanques
+                                // Agregarlo antes de dispensario o al final si no hay
+                                var dispensario = productoElement.Element(Covol + "DISPENSARIO");
+                                if (dispensario != null)
+                                    dispensario.AddBeforeSelf(tanqueElement);
+                                else
+                                    productoElement.Add(tanqueElement);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            File.AppendAllText(logPath, $"Error al parsear tanque estático de la empresa: {ex.Message}\n");
+                        }
+                    }
+                }
+
+                if (tanqueElement == null && tanques.Count > 0)
+                {
+                    tanqueElement = tanques.First();
+                }
+
+                if (tanqueElement != null)
+                {
                     tanqueElement.Add(
                         CrearExistencias(fechaOperacion, inventario, resumen),
                         CrearRecepcionesConCFDI(resumen, recepcionesTx, inventario),
@@ -340,7 +389,44 @@ public sealed class CovolDailyXmlExporter
                         new XElement(Covol + "LocalizODescripSistMedicionTanque", $"Medición {productoLike}"),
                         new XElement(Covol + "VigenciaCalibracionSistMedicionTanque", $"{fechaOperacion.Year}-12-31"),
                         new XElement(Covol + "IncertidumbreMedicionSistMedicionTanque", 0.010)
-                    ),
+                    )
+                );
+
+                if (_empresaId.HasValue)
+                {
+                    var empresasRepo = new EmpresasRepository(_connectionString);
+                    var tanquesEmpresa = await empresasRepo.GetTanquesByEmpresaAsync(_empresaId.Value);
+                    var tanqueProd = tanquesEmpresa.FirstOrDefault(t => productoLike.Contains(t.Producto, StringComparison.OrdinalIgnoreCase) || t.Producto.Contains(productoLike, StringComparison.OrdinalIgnoreCase));
+                    if (tanqueProd != null && !string.IsNullOrWhiteSpace(tanqueProd.XmlTanque))
+                    {
+                        try
+                        {
+                            string xmlString = tanqueProd.XmlTanque.Trim();
+                            if (xmlString.StartsWith("<Covol:TANQUE") && !xmlString.Contains("</Covol:TANQUE>"))
+                            {
+                                xmlString += "\n</Covol:TANQUE>";
+                            }
+                            else if (xmlString.StartsWith("<TANQUE") && !xmlString.Contains("</TANQUE>"))
+                            {
+                                xmlString += "\n</TANQUE>";
+                            }
+
+                            string xmlToParse = $"<root xmlns:Covol=\"{Covol.NamespaceName}\">{xmlString}</root>";
+                            var tempRoot = XElement.Parse(xmlToParse);
+                            var parsedTanque = tempRoot.Elements().FirstOrDefault();
+                            if (parsedTanque != null)
+                            {
+                                tanqueElement = parsedTanque;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            File.AppendAllText(logPath, $"Error al parsear tanque estático sin base de la empresa: {ex.Message}\n");
+                        }
+                    }
+                }
+
+                tanqueElement.Add(
                     CrearExistencias(fechaOperacion, inventario, resumen),
                     CrearRecepcionesVacias(resumen),
                     CrearEntregasVacias()
