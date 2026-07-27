@@ -1176,7 +1176,7 @@ public partial class MainForm : Form
         return false;
     }
 
-    private async void btnActualizarCalibracion_Click(object? sender, EventArgs e)
+    private async void btnCalibracionTanques_Click(object? sender, EventArgs e)
     {
         if (!TieneConexionActiva())
             return;
@@ -1187,8 +1187,8 @@ public partial class MainForm : Form
 
         var confirm = MessageBox.Show(
             this, 
-            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los XMLs base del mes {mes:00}/{anio} y en los Tanques de las Empresas configuradas?", 
-            "Confirmar modificación masiva", 
+            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los TANQUES en los XMLs base del mes {mes:00}/{anio} y en los Tanques de las Empresas configuradas?", 
+            "Confirmar modificación masiva (Tanques)", 
             MessageBoxButtons.YesNo, 
             MessageBoxIcon.Question
         );
@@ -1196,19 +1196,20 @@ public partial class MainForm : Form
         if (confirm != DialogResult.Yes)
             return;
 
-        btnActualizarCalibracion.Enabled = false;
+        btnCalibracionTanques.Enabled = false;
+        btnCalibracionDispensarios.Enabled = false;
 
         try
         {
             var repo = new CovolRepository(_connectionString!);
-            int updated = await repo.ActualizarCalibracionesMensualAsync(anio, mes, nuevaFecha);
+            int updated = await repo.ActualizarCalibracionesMensualAsync(anio, mes, nuevaFecha, true, false);
 
             var empRepo = new EmpresasRepository(_connectionString!);
             int empUpdated = await empRepo.ActualizarFechasCalibracionMasivaAsync(nuevaFecha);
 
             MessageBox.Show(
                 this, 
-                $"Se actualizaron las fechas de calibración en {updated} plantillas y en {empUpdated} configuraciones de tanques. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
+                $"Se actualizaron las fechas de calibración de TANQUES en {updated} plantillas y en {empUpdated} configuraciones de tanques. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
                 "Actualización exitosa", 
                 MessageBoxButtons.OK, 
                 MessageBoxIcon.Information
@@ -1226,7 +1227,61 @@ public partial class MainForm : Form
         }
         finally
         {
-            btnActualizarCalibracion.Enabled = true;
+            btnCalibracionTanques.Enabled = true;
+            btnCalibracionDispensarios.Enabled = true;
+        }
+    }
+
+    private async void btnCalibracionDispensarios_Click(object? sender, EventArgs e)
+    {
+        if (!TieneConexionActiva())
+            return;
+
+        int anio = (int)numAnio.Value;
+        int mes = (int)numMes.Value;
+        DateOnly nuevaFecha = DateOnly.FromDateTime(dtpCalibracionMasiva.Value);
+
+        var confirm = MessageBox.Show(
+            this, 
+            $"¿Estás seguro de que deseas actualizar la fecha de calibración a {nuevaFecha:dd/MM/yyyy} para todos los DISPENSARIOS/MANGUERAS en los XMLs base del mes {mes:00}/{anio}?", 
+            "Confirmar modificación masiva (Dispensarios)", 
+            MessageBoxButtons.YesNo, 
+            MessageBoxIcon.Question
+        );
+
+        if (confirm != DialogResult.Yes)
+            return;
+
+        btnCalibracionTanques.Enabled = false;
+        btnCalibracionDispensarios.Enabled = false;
+
+        try
+        {
+            var repo = new CovolRepository(_connectionString!);
+            int updated = await repo.ActualizarCalibracionesMensualAsync(anio, mes, nuevaFecha, false, true);
+
+            MessageBox.Show(
+                this, 
+                $"Se actualizaron las fechas de calibración de DISPENSARIOS en {updated} plantillas. Cuando generes los diarios, éstos saldrán con la nueva fecha.", 
+                "Actualización exitosa", 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Information
+            );
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this, 
+                "Ocurrió un error al actualizar las calibraciones: " + ex.Message, 
+                "Error", 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Error
+            );
+        }
+        finally
+        {
+            btnCalibracionTanques.Enabled = true;
+            btnCalibracionDispensarios.Enabled = true;
         }
     }
     

@@ -95,8 +95,8 @@ partial class MainForm
         grpModificacionMasiva = new GroupBox();
         lblFechaCalibracion = new Label();
         dtpCalibracionMasiva = new DateTimePicker();
-        btnActualizarCalibracion = new Button();
-        
+        btnCalibracionTanques = new Button();
+        btnCalibracionDispensarios = new Button();
         lblEmpresaTanques = new Label();
         cmbEmpresaTanques = new ComboBox();
         btnGestionarEmpresas = new Button();
@@ -504,7 +504,8 @@ partial class MainForm
         grpModificacionMasiva.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         grpModificacionMasiva.Controls.Add(lblFechaCalibracion);
         grpModificacionMasiva.Controls.Add(dtpCalibracionMasiva);
-        grpModificacionMasiva.Controls.Add(btnActualizarCalibracion);
+        grpModificacionMasiva.Controls.Add(btnCalibracionTanques);
+        grpModificacionMasiva.Controls.Add(btnCalibracionDispensarios);
         grpModificacionMasiva.Controls.Add(btnGestionarEmpresas);
         grpModificacionMasiva.Location = new Point(18, 212);
         grpModificacionMasiva.Margin = new Padding(3, 2, 3, 2);
@@ -516,10 +517,10 @@ partial class MainForm
         // 
         // btnGestionarEmpresas
         // 
-        btnGestionarEmpresas.Location = new Point(460, 24);
+        btnGestionarEmpresas.Location = new Point(680, 24);
         btnGestionarEmpresas.Name = "btnGestionarEmpresas";
         btnGestionarEmpresas.Size = new Size(180, 26);
-        btnGestionarEmpresas.TabIndex = 3;
+        btnGestionarEmpresas.TabIndex = 4;
         btnGestionarEmpresas.Text = "Gestionar Tanques/Empresas";
         btnGestionarEmpresas.UseVisualStyleBackColor = true;
         btnGestionarEmpresas.Click += btnGestionarEmpresas_Click;
@@ -541,15 +542,25 @@ partial class MainForm
         dtpCalibracionMasiva.Size = new Size(120, 23);
         dtpCalibracionMasiva.TabIndex = 1;
         // 
-        // btnActualizarCalibracion
+        // btnCalibracionTanques
         // 
-        btnActualizarCalibracion.Location = new Point(290, 24);
-        btnActualizarCalibracion.Name = "btnActualizarCalibracion";
-        btnActualizarCalibracion.Size = new Size(150, 26);
-        btnActualizarCalibracion.TabIndex = 2;
-        btnActualizarCalibracion.Text = "Actualizar Vigencia";
-        btnActualizarCalibracion.UseVisualStyleBackColor = true;
-        btnActualizarCalibracion.Click += btnActualizarCalibracion_Click;
+        btnCalibracionTanques.Location = new Point(300, 24);
+        btnCalibracionTanques.Name = "btnCalibracionTanques";
+        btnCalibracionTanques.Size = new Size(180, 26);
+        btnCalibracionTanques.TabIndex = 2;
+        btnCalibracionTanques.Text = "Fecha calibración tanques";
+        btnCalibracionTanques.UseVisualStyleBackColor = true;
+        btnCalibracionTanques.Click += btnCalibracionTanques_Click;
+        // 
+        // btnCalibracionDispensarios
+        // 
+        btnCalibracionDispensarios.Location = new Point(490, 24);
+        btnCalibracionDispensarios.Name = "btnCalibracionDispensarios";
+        btnCalibracionDispensarios.Size = new Size(180, 26);
+        btnCalibracionDispensarios.TabIndex = 3;
+        btnCalibracionDispensarios.Text = "Fecha calibración dispensarios";
+        btnCalibracionDispensarios.UseVisualStyleBackColor = true;
+        btnCalibracionDispensarios.Click += btnCalibracionDispensarios_Click;
         // 
         // tabExportacion
         // 
@@ -742,7 +753,8 @@ partial class MainForm
     private GroupBox grpModificacionMasiva;
     private Label lblFechaCalibracion;
     private DateTimePicker dtpCalibracionMasiva;
-    private Button btnActualizarCalibracion;
+    private Button btnCalibracionTanques;
+    private Button btnCalibracionDispensarios;
     private Label lblEmpresaTanques;
     private ComboBox cmbEmpresaTanques;
     private Button btnGestionarEmpresas;

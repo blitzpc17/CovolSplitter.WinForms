@@ -731,7 +731,7 @@ public sealed class CovolRepository
 
         await tx.CommitAsync(ct);
     }
-    public async Task<int> ActualizarCalibracionesMensualAsync(int anio, int mes, DateOnly nuevaFecha)
+    public async Task<int> ActualizarCalibracionesMensualAsync(int anio, int mes, DateOnly nuevaFecha, bool updateTanques, bool updateDispensarios)
     {
         await using var cn = new NpgsqlConnection(_connectionString);
         await cn.OpenAsync();
@@ -755,25 +755,31 @@ public sealed class CovolRepository
             try
             {
                 var doc = System.Xml.Linq.XDocument.Parse(xmlBase);
-                var nodosTanque = doc.Descendants(covol + "VigenciaCalibracionTanque").ToList();
-                foreach(var n in nodosTanque)
+                if (updateTanques)
                 {
-                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
-                    changed = true;
+                    var nodosTanque = doc.Descendants(covol + "VigenciaCalibracionTanque").ToList();
+                    foreach(var n in nodosTanque)
+                    {
+                        n.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                        changed = true;
+                    }
+
+                    var nodosSist = doc.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").ToList();
+                    foreach(var n in nodosSist)
+                    {
+                        n.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                        changed = true;
+                    }
                 }
 
-                var nodosSist = doc.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").ToList();
-                foreach(var n in nodosSist)
+                if (updateDispensarios)
                 {
-                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
-                    changed = true;
-                }
-
-                var nodosManguera = doc.Descendants(covol + "VigenciaCalibracionSistMedicionManguera").ToList();
-                foreach(var n in nodosManguera)
-                {
-                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
-                    changed = true;
+                    var nodosManguera = doc.Descendants(covol + "VigenciaCalibracionSistMedicionManguera").ToList();
+                    foreach(var n in nodosManguera)
+                    {
+                        n.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                        changed = true;
+                    }
                 }
 
                 if (changed)
