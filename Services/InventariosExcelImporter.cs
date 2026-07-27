@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using CovolSplitter.WinForms.Models;
 
 namespace CovolSplitter.WinForms.Services;
@@ -52,21 +52,19 @@ public sealed class InventariosExcelImporter
 
             foreach (var producto in productos)
             {
-                var value = ObtenerDecimal(ws.Cell(row, producto.Value));
+                var anterior = ObtenerDecimal(ws.Cell(row, producto.Value));
 
-                if (value is null)
+                if (anterior is null)
                     continue;
 
-                decimal? anterior = null;
+                decimal? actual = null;
+                var nextRow = BuscarFilaSiguiente(ws, header.FechaCol, row, fecha.Value.AddDays(1));
 
-                var prevRow = BuscarFilaAnteriorMismoMes(ws, header.FechaCol, producto.Value, row, anio, mes);
-
-                if (prevRow > 0)
+                if (nextRow > 0)
                 {
-                    var prevValue = ObtenerDecimal(ws.Cell(prevRow, producto.Value));
-
-                    if (prevValue is not null)
-                        anterior = prevValue.Value;
+                    var valAct = ObtenerDecimal(ws.Cell(nextRow, producto.Value));
+                    if (valAct is not null)
+                        actual = valAct.Value;
                 }
 
                 result.Add(new InventarioDiario
@@ -76,7 +74,7 @@ public sealed class InventariosExcelImporter
                     Dia = dia,
                     FechaOperacion = fecha.Value.Date,
                     ProductoLike = producto.Key,
-                    VolumenExistencias = value.Value,
+                    VolumenExistencias = actual ?? anterior.Value, // Fallback en caso de ser el ultimo dia y no haber fila siguiente
                     VolumenExistenciasAnterior = anterior,
                     ArchivoOrigen = Path.GetFileName(filePath)
                 });
@@ -94,22 +92,24 @@ public sealed class InventariosExcelImporter
         return result;
     }
 
-    private static int BuscarFilaAnteriorMismoMes(
+    private static int BuscarFilaSiguiente(
         IXLWorksheet ws,
         int fechaCol,
-        int productoCol,
         int currentRow,
-        int anio,
-        int mes)
+        DateTime fechaBuscada)
     {
-        for (var row = currentRow - 1; row >= 1; row--)
+        var maxRow = ws.LastRowUsed()?.RowNumber() ?? currentRow + 31;
+        for (var row = currentRow + 1; row <= maxRow; row++)
         {
-            var fecha = ObtenerFechaDesdeCelda(ws.Cell(row, fechaCol), anio, mes, 0);
+            var fecha = ObtenerFechaDesdeCelda(ws.Cell(row, fechaCol), fechaBuscada.Year, fechaBuscada.Month, 0);
+            if (fecha is not null && fecha.Value.Date == fechaBuscada.Date)
+                return row;
+        }
 
-            if (fecha is null)
-                continue;
-
-            if (fecha.Value.Year == anio && fecha.Value.Month == mes)
+        // Si no se encuentra exactamente, buscar la siguiente fila que no esté vacía en la columna de fecha
+        for (var row = currentRow + 1; row <= maxRow; row++)
+        {
+            if (!ws.Cell(row, fechaCol).IsEmpty())
                 return row;
         }
 

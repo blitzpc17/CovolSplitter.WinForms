@@ -125,19 +125,19 @@ public sealed class EmpresasRepository
                 var tanqueElement = nodoRaiz.Elements().FirstOrDefault();
                 if (tanqueElement == null) continue;
 
-                var nodoVigenciaTanque = tanqueElement.Descendants(covol + "VigenciaCalibracionTanque").FirstOrDefault()
-                                      ?? tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionTanque").FirstOrDefault();
-                if (nodoVigenciaTanque != null)
+                var nodosVigenciaTanque = tanqueElement.Descendants(covol + "VigenciaCalibracionTanque").ToList();
+                nodosVigenciaTanque.AddRange(tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionTanque"));
+                foreach (var nodo in nodosVigenciaTanque)
                 {
-                    nodoVigenciaTanque.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    nodo.Value = nuevaFecha.ToString("yyyy-MM-dd");
                     changed = true;
                 }
 
-                var nodoVigenciaSist = tanqueElement.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault()
-                                    ?? tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault();
-                if (nodoVigenciaSist != null)
+                var nodosVigenciaSist = tanqueElement.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").ToList();
+                nodosVigenciaSist.AddRange(tanqueElement.Descendants(covolAlterno + "VigenciaCalibracionSistMedicionTanque"));
+                foreach (var nodo in nodosVigenciaSist)
                 {
-                    nodoVigenciaSist.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    nodo.Value = nuevaFecha.ToString("yyyy-MM-dd");
                     changed = true;
                 }
 

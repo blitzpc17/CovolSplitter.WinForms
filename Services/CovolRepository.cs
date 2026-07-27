@@ -755,17 +755,24 @@ public sealed class CovolRepository
             try
             {
                 var doc = System.Xml.Linq.XDocument.Parse(xmlBase);
-                var nodoTanque = doc.Descendants(covol + "VigenciaCalibracionTanque").FirstOrDefault();
-                if (nodoTanque != null)
+                var nodosTanque = doc.Descendants(covol + "VigenciaCalibracionTanque").ToList();
+                foreach(var n in nodosTanque)
                 {
-                    nodoTanque.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
                     changed = true;
                 }
 
-                var nodoSist = doc.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").FirstOrDefault();
-                if (nodoSist != null)
+                var nodosSist = doc.Descendants(covol + "VigenciaCalibracionSistMedicionTanque").ToList();
+                foreach(var n in nodosSist)
                 {
-                    nodoSist.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                    changed = true;
+                }
+
+                var nodosManguera = doc.Descendants(covol + "VigenciaCalibracionSistMedicionManguera").ToList();
+                foreach(var n in nodosManguera)
+                {
+                    n.Value = nuevaFecha.ToString("yyyy-MM-dd");
                     changed = true;
                 }
 
