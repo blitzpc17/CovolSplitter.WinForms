@@ -276,6 +276,8 @@ public sealed class CovolDailyXmlExporter
                             
                             if (tanqueElement != null)
                             {
+                                tanqueElement.Remove(); // Detach from tempRoot to prevent cloning
+
                                 tanques.ForEach(t => t.Remove()); // Remove existing tanques
                                 // Agregarlo antes de dispensario o al final si no hay
                                 var dispensario = productoElement.Element(Covol + "DISPENSARIO");
@@ -534,22 +536,31 @@ public sealed class CovolDailyXmlExporter
 
     private static XElement CrearExistencias(DateOnly fechaOperacion, dynamic? inventario, dynamic? resumen)
     {
+        decimal volAnt = inventario?.volumen_existencias_anterior ?? 0m;
+        decimal volAct = inventario?.volumen_existencias ?? 0m;
+        
+        // Regla: Recepción siempre es 0
+        decimal volRecep = 0m;
+
+        // Regla: Entrega es la diferencia (OPCION1 - OPCION2) es decir (Anterior - Actual)
+        decimal volEntrega = volAnt - volAct;
+
         return new XElement(Covol + "EXISTENCIAS",
             new XElement(Covol + "VolumenExistenciasAnterior",
-                new XElement(Covol + "ValorNumerico", inventario?.volumen_existencias_anterior ?? 0)
+                new XElement(Covol + "ValorNumerico", volAnt)
             ),
             new XElement(Covol + "VolumenAcumOpsRecepcion",
-                new XElement(Covol + "ValorNumerico", resumen?.volumen_recepcion ?? 0),
+                new XElement(Covol + "ValorNumerico", volRecep),
                 new XElement(Covol + "UM", "UM03")
             ),
             new XElement(Covol + "HoraRecepcionAcumulado", "23:59:59-06:00"),
             new XElement(Covol + "VolumenAcumOpsEntrega",
-                new XElement(Covol + "ValorNumerico", resumen?.volumen_entrega ?? 0),
+                new XElement(Covol + "ValorNumerico", volEntrega),
                 new XElement(Covol + "UM", "UM03")
             ),
             new XElement(Covol + "HoraEntregaAcumulado", "23:59:59-06:00"),
             new XElement(Covol + "VolumenExistencias",
-                new XElement(Covol + "ValorNumerico", inventario?.volumen_existencias ?? 0)
+                new XElement(Covol + "ValorNumerico", volAct)
             ),
             new XElement(Covol + "FechaYHoraEstaMedicion", $"{fechaOperacion:yyyy-MM-dd}T23:59:59-06:00"),
             new XElement(Covol + "FechaYHoraMedicionAnterior", $"{fechaOperacion.AddDays(-1):yyyy-MM-dd}T23:59:59-06:00")
