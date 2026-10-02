@@ -775,10 +775,37 @@ public sealed class CovolRepository
                 if (updateDispensarios)
                 {
                     var nodosManguera = doc.Descendants(covol + "VigenciaCalibracionSistMedicionManguera").ToList();
-                    foreach(var n in nodosManguera)
+                    if (nodosManguera.Any())
                     {
-                        n.Value = nuevaFecha.ToString("yyyy-MM-dd");
-                        changed = true;
+                        foreach(var n in nodosManguera)
+                        {
+                            n.Value = nuevaFecha.ToString("yyyy-MM-dd");
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        // Si no hay dispensarios pero pidieron actualizar, inyectamos uno genérico en la base
+                        var producto = doc.Descendants(covol + "PRODUCTO").FirstOrDefault();
+                        if (producto != null)
+                        {
+                            var mangueraGen = new System.Xml.Linq.XElement(covol + "MANGUERA",
+                                new System.Xml.Linq.XElement(covol + "IdentificadorManguera", "MG-GEN"),
+                                new System.Xml.Linq.XElement(covol + "MedidorManguera",
+                                    new System.Xml.Linq.XElement(covol + "SistemaMedicionManguera", "SMM"),
+                                    new System.Xml.Linq.XElement(covol + "VigenciaCalibracionSistMedicionManguera", nuevaFecha.ToString("yyyy-MM-dd")),
+                                    new System.Xml.Linq.XElement(covol + "IncertidumbreMedicionSistMedicionManguera", 0.010)
+                                )
+                            );
+
+                            var dispensarioGen = new System.Xml.Linq.XElement(covol + "DISPENSARIO",
+                                new System.Xml.Linq.XElement(covol + "ClaveDispensario", "DISP-GEN"),
+                                mangueraGen
+                            );
+
+                            producto.Add(dispensarioGen);
+                            changed = true;
+                        }
                     }
                 }
 

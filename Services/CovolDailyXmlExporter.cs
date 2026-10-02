@@ -215,7 +215,11 @@ public sealed class CovolDailyXmlExporter
                     t.precio_venta_publico AS PrecioVentaPublico,
                     t.precio_venta AS PrecioVenta,
                     t.volumen AS Volumen,
-                    t.um AS Um
+                    t.um AS Um,
+                    t.dispensario AS Dispensario,
+                    t.manguera AS Manguera,
+                    t.numero_registro AS NumeroRegistro,
+                    t.tipo_registro AS TipoRegistro
                 FROM covol.transacciones t
                 JOIN covol.productos p ON p.id = t.producto_id
                 WHERE t.anio = @anio
@@ -308,31 +312,15 @@ public sealed class CovolDailyXmlExporter
                     );
                 }
 
-                if (mangueras.Count == 0 && entregasTx.Count > 0)
+                if (entregasTx.Count > 0)
                 {
-                    File.AppendAllText(logPath, $"   => ¡NOTA! Creando Manguera genérica porque el archivo base no tiene MANGUERAS.\n");
+                    var templateManguera = mangueras.FirstOrDefault();
+                    string sysMed = templateManguera?.Element(Covol + "MedidorManguera")?.Element(Covol + "SistemaMedicionManguera")?.Value ?? "SMM";
+                    string vigencia = templateManguera?.Element(Covol + "MedidorManguera")?.Element(Covol + "VigenciaCalibracionSistMedicionManguera")?.Value ?? $"{fechaOperacion.Year}-12-31";
+                    string incertidumbre = templateManguera?.Element(Covol + "MedidorManguera")?.Element(Covol + "IncertidumbreMedicionSistMedicionManguera")?.Value ?? "0.010";
 
-                    var mangueraGen = new XElement(Covol + "MANGUERA",
-                        new XElement(Covol + "IdentificadorManguera", $"MG-GEN"),
-                        new XElement(Covol + "MedidorManguera",
-                            new XElement(Covol + "SistemaMedicionManguera", "SMM"),
-                            new XElement(Covol + "VigenciaCalibracionSistMedicionManguera", $"{fechaOperacion.Year}-12-31"),
-                            new XElement(Covol + "IncertidumbreMedicionSistMedicionManguera", 0.010)
-                        )
-                    );
-
-                    var dispensarioGen = new XElement(Covol + "DISPENSARIO",
-                        new XElement(Covol + "ClaveDispensario", $"DISP-GEN"),
-                        mangueraGen
-                    );
-
-                    productoElement.Add(dispensarioGen);
-                    mangueras.Add(mangueraGen);
-                }
-
-                if (mangueras.Count > 0 && entregasTx.Count > 0)
-                {
-                    ProrratearEntregas(mangueras, entregasTx);
+                    productoElement.Elements(Covol + "DISPENSARIO").Remove();
+                    GenerarDispensariosYEntregas(productoElement, entregasTx, sysMed, vigencia, incertidumbre);
                 }
             }
             else
@@ -438,22 +426,7 @@ public sealed class CovolDailyXmlExporter
 
                 if (entregasTx.Count > 0)
                 {
-                    var mangueraGen = new XElement(Covol + "MANGUERA",
-                        new XElement(Covol + "IdentificadorManguera", $"MG-GEN"),
-                        new XElement(Covol + "MedidorManguera",
-                            new XElement(Covol + "SistemaMedicionManguera", "SMM"),
-                            new XElement(Covol + "VigenciaCalibracionSistMedicionManguera", $"{fechaOperacion.Year}-12-31"),
-                            new XElement(Covol + "IncertidumbreMedicionSistMedicionManguera", 0.010)
-                        )
-                    );
-
-                    var dispensarioGen = new XElement(Covol + "DISPENSARIO",
-                        new XElement(Covol + "ClaveDispensario", $"DISP-GEN"),
-                        mangueraGen
-                    );
-
-                    productoElement.Add(dispensarioGen);
-                    ProrratearEntregas(new List<XElement> { mangueraGen }, entregasTx);
+                    GenerarDispensariosYEntregas(productoElement, entregasTx, "SMM", $"{fechaOperacion.Year}-12-31", "0.010");
                 }
             }
 
@@ -632,73 +605,88 @@ public sealed class CovolDailyXmlExporter
         return root;
     }
 
-    private static void ProrratearEntregas(List<XElement> mangueras, List<CovolTransaction> entregas)
+    private static void GenerarDispensariosYEntregas(XElement productoElement, List<CovolTransaction> entregas, string sysMed, string vigencia, string incertidumbre)
     {
-        // Round robin a mangueras
-        var groups = entregas
-            .Select((x, i) => new { Tx = x, Index = i % mangueras.Count })
-            .GroupBy(x => x.Index)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.Tx).ToList());
+        var dispGroups = entregas.GroupBy(x => string.IsNullOrWhiteSpace(x.Dispensario) ? "DISP-GEN" : x.Dispensario).OrderBy(g => g.Key);
 
-        for (int i = 0; i < mangueras.Count; i++)
+        foreach (var dispGroup in dispGroups)
         {
-            var txs = groups.ContainsKey(i) ? groups[i] : new List<CovolTransaction>();
-            
-            var entregasRoot = new XElement(Covol + "ENTREGAS",
-                new XElement(Covol + "TotalEntregas", txs.Count),
-                new XElement(Covol + "SumaVolumenEntregado",
-                    new XElement(Covol + "ValorNumerico", txs.Sum(x => x.Volumen ?? 0)),
-                    new XElement(Covol + "UM", "UM03")
-                ),
-                new XElement(Covol + "TotalDocumentos", txs.Count)
+            var dispensarioElem = new XElement(Covol + "DISPENSARIO",
+                new XElement(Covol + "ClaveDispensario", dispGroup.Key)
             );
 
-            int numRegistro = 1;
-            decimal volAcumulado = 0m;
+            var mangGroups = dispGroup.GroupBy(x => string.IsNullOrWhiteSpace(x.Manguera) ? "MG-GEN" : x.Manguera).OrderBy(g => g.Key);
 
-            foreach (var t in txs)
+            foreach (var mangGroup in mangGroups)
             {
-                var vol = t.Volumen ?? 0;
-                volAcumulado += vol;
+                var mangueraElem = new XElement(Covol + "MANGUERA",
+                    new XElement(Covol + "IdentificadorManguera", mangGroup.Key),
+                    new XElement(Covol + "MedidorManguera",
+                        new XElement(Covol + "SistemaMedicionManguera", sysMed),
+                        new XElement(Covol + "VigenciaCalibracionSistMedicionManguera", vigencia),
+                        new XElement(Covol + "IncertidumbreMedicionSistMedicionManguera", double.Parse(incertidumbre, System.Globalization.CultureInfo.InvariantCulture))
+                    )
+                );
 
-                var entregaElem = new XElement(Covol + "ENTREGA",
-                    new XElement(Covol + "NumeroDeRegistro", numRegistro++),
-                    new XElement(Covol + "TipoDeRegistro", "D"),
-                    new XElement(Covol + "VolumenEntregadoTotalizadorAcum",
-                        new XElement(Covol + "ValorNumerico", volAcumulado),
+                var txs = mangGroup.OrderBy(t => t.FechaTransaccion).ToList();
+                var entregasRoot = new XElement(Covol + "ENTREGAS",
+                    new XElement(Covol + "TotalEntregas", txs.Count),
+                    new XElement(Covol + "SumaVolumenEntregado",
+                        new XElement(Covol + "ValorNumerico", txs.Sum(x => x.Volumen ?? 0)),
                         new XElement(Covol + "UM", "UM03")
                     ),
-                    new XElement(Covol + "VolumenEntregadoTotalizadorInsta",
-                        new XElement(Covol + "ValorNumerico", vol),
-                        new XElement(Covol + "UM", "UM03")
-                    ),
-                    new XElement(Covol + "FechaYHoraEntrega", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
-                    new XElement(Covol + "Complemento",
-                        new XElement(Covol + "Complemento_Expendio",
-                            new XElement(Exp + "NACIONAL",
-                                new XElement(Exp + "RfcClienteOProveedor", t.RfcClienteProveedor ?? ""),
-                                new XElement(Exp + "NombreClienteOProveedor", t.NombreClienteProveedor ?? ""),
-                                new XElement(Exp + "PermisoProveedor", t.PermisoProveedor ?? ""),
-                                new XElement(Exp + "CFDIs",
-                                    new XElement(Exp + "CFDI", t.Cfdi?.ToString().ToUpper() ?? ""),
-                                    new XElement(Exp + "TipoCFDI", t.TipoCfdi ?? "Ingreso"),
-                                    new XElement(Exp + "PrecioCompra", t.PrecioCompra ?? 0),
-                                    new XElement(Exp + "PrecioDeVentaAlPublico", t.PrecioVentaPublico ?? 0),
-                                    new XElement(Exp + "PrecioVenta", t.PrecioVenta ?? 0),
-                                    new XElement(Exp + "FechaYHoraTransaccion", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
-                                    new XElement(Exp + "VolumenDocumentado",
-                                        new XElement(Exp + "ValorNumerico", vol),
-                                        new XElement(Exp + "UM", "UM03")
+                    new XElement(Covol + "TotalDocumentos", txs.Count)
+                );
+
+                int numRegistro = 1;
+                decimal volAcumulado = 0m;
+
+                foreach (var t in txs)
+                {
+                    var vol = t.Volumen ?? 0;
+                    volAcumulado += vol;
+
+                    var entregaElem = new XElement(Covol + "ENTREGA",
+                        new XElement(Covol + "NumeroDeRegistro", t.NumeroRegistro ?? numRegistro++),
+                        new XElement(Covol + "TipoDeRegistro", t.TipoRegistro ?? "D"),
+                        new XElement(Covol + "VolumenEntregadoTotalizadorAcum",
+                            new XElement(Covol + "ValorNumerico", volAcumulado),
+                            new XElement(Covol + "UM", "UM03")
+                        ),
+                        new XElement(Covol + "VolumenEntregadoTotalizadorInsta",
+                            new XElement(Covol + "ValorNumerico", vol),
+                            new XElement(Covol + "UM", "UM03")
+                        ),
+                        new XElement(Covol + "FechaYHoraEntrega", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
+                        new XElement(Covol + "Complemento",
+                            new XElement(Covol + "Complemento_Expendio",
+                                new XElement(Exp + "NACIONAL",
+                                    new XElement(Exp + "RfcClienteOProveedor", t.RfcClienteProveedor ?? ""),
+                                    new XElement(Exp + "NombreClienteOProveedor", t.NombreClienteProveedor ?? ""),
+                                    new XElement(Exp + "PermisoProveedor", t.PermisoProveedor ?? ""),
+                                    new XElement(Exp + "CFDIs",
+                                        new XElement(Exp + "CFDI", t.Cfdi?.ToString().ToUpper() ?? ""),
+                                        new XElement(Exp + "TipoCFDI", t.TipoCfdi ?? "Ingreso"),
+                                        new XElement(Exp + "PrecioCompra", t.PrecioCompra ?? 0),
+                                        new XElement(Exp + "PrecioDeVentaAlPublico", t.PrecioVentaPublico ?? 0),
+                                        new XElement(Exp + "PrecioVenta", t.PrecioVenta ?? 0),
+                                        new XElement(Exp + "FechaYHoraTransaccion", $"{t.FechaTransaccion:yyyy-MM-ddTHH:mm:sszzz}"),
+                                        new XElement(Exp + "VolumenDocumentado",
+                                            new XElement(Exp + "ValorNumerico", vol),
+                                            new XElement(Exp + "UM", "UM03")
+                                        )
                                     )
                                 )
                             )
                         )
-                    )
-                );
-                entregasRoot.Add(entregaElem);
-            }
+                    );
+                    entregasRoot.Add(entregaElem);
+                }
 
-            mangueras[i].Add(entregasRoot);
+                mangueraElem.Add(entregasRoot);
+                dispensarioElem.Add(mangueraElem);
+            }
+            productoElement.Add(dispensarioElem);
         }
     }
 
