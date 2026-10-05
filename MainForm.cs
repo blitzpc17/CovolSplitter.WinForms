@@ -116,6 +116,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 $"Error al eliminar el archivo:\n{ex.Message}",
@@ -171,6 +172,7 @@ public partial class MainForm : Form
             await empresasRepo.InitTablesAsync();
 
             _connectionString = cn;
+            ExceptionLogger.GlobalConnectionString = cn;
 
             HabilitarSistema();
 
@@ -226,6 +228,61 @@ public partial class MainForm : Form
         await ProbarConexionAsync(true);
     }
 
+    private async void btnCrearBD_Click(object sender, EventArgs e)
+    {
+        var cn = txtConnectionString.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(cn))
+        {
+            MessageBox.Show(
+                this,
+                "La cadena de conexión es obligatoria.",
+                "Configuración",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning
+            );
+            return;
+        }
+
+        btnCrearBD.Enabled = false;
+        lblConfigEstado.ForeColor = Color.Black;
+        lblConfigEstado.Text = "Creando base de datos y esquema...";
+
+        try
+        {
+            await DatabaseSetupService.CreateDatabaseAndSchemaAsync(cn);
+            
+            lblConfigEstado.Text = "Base de datos y tablas creadas con éxito. Ahora puedes probar la conexión.";
+            lblConfigEstado.ForeColor = Color.ForestGreen;
+
+            MessageBox.Show(
+                this,
+                "La base de datos y las tablas fueron creadas exitosamente.",
+                "Configuración",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+        }
+        catch (Exception ex)
+        {
+            ExceptionLogger.LogException(ex);
+            lblConfigEstado.Text = "Error al crear la BD.";
+            lblConfigEstado.ForeColor = Color.Firebrick;
+
+            MessageBox.Show(
+                this,
+                ex.Message,
+                "Error de configuración",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
+        finally
+        {
+            btnCrearBD.Enabled = true;
+        }
+    }
+
     private async Task ProbarConexionAsync(bool guardar)
     {
         var cn = txtConnectionString.Text.Trim();
@@ -259,6 +316,7 @@ public partial class MainForm : Form
             }
 
             _connectionString = cn;
+            ExceptionLogger.GlobalConnectionString = cn;
 
             HabilitarSistema();
 
@@ -280,6 +338,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             BloquearSistema();
 
             lblConfigEstado.Text = "Error de conexión.";
@@ -355,6 +414,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -521,6 +581,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -561,6 +622,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -616,6 +678,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -678,6 +741,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -811,6 +875,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -910,6 +975,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -1025,6 +1091,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this,
                 ex.Message,
@@ -1217,6 +1284,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this, 
                 "Ocurrió un error al actualizar las calibraciones: " + ex.Message, 
@@ -1270,6 +1338,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            ExceptionLogger.LogException(ex);
             MessageBox.Show(
                 this, 
                 "Ocurrió un error al actualizar las calibraciones: " + ex.Message, 

@@ -15,6 +15,7 @@ partial class MainForm
     private TextBox txtConnectionString;
     private Button btnProbarConexion;
     private Button btnGuardarConfiguracion;
+    private Button btnCrearBD;
     private Label lblConfigEstado;
 
     private GroupBox grpFiltrosConsulta;
@@ -68,6 +69,7 @@ partial class MainForm
         txtConnectionString = new TextBox();
         btnProbarConexion = new Button();
         btnGuardarConfiguracion = new Button();
+        btnCrearBD = new Button();
         lblConfigEstado = new Label();
         tabConsulta = new TabPage();
         grpFiltrosConsulta = new GroupBox();
@@ -150,6 +152,7 @@ partial class MainForm
         tabConfiguracion.Controls.Add(txtConnectionString);
         tabConfiguracion.Controls.Add(btnProbarConexion);
         tabConfiguracion.Controls.Add(btnGuardarConfiguracion);
+        tabConfiguracion.Controls.Add(btnCrearBD);
         tabConfiguracion.Controls.Add(lblConfigEstado);
         tabConfiguracion.Location = new Point(4, 24);
         tabConfiguracion.Margin = new Padding(3, 2, 3, 2);
@@ -203,13 +206,24 @@ partial class MainForm
         btnGuardarConfiguracion.UseVisualStyleBackColor = true;
         btnGuardarConfiguracion.Click += btnGuardarConfiguracion_Click;
         // 
+        // btnCrearBD
+        // 
+        btnCrearBD.Location = new Point(367, 123);
+        btnCrearBD.Margin = new Padding(3, 2, 3, 2);
+        btnCrearBD.Name = "btnCrearBD";
+        btnCrearBD.Size = new Size(166, 28);
+        btnCrearBD.TabIndex = 4;
+        btnCrearBD.Text = "Crear BD y Tablas";
+        btnCrearBD.UseVisualStyleBackColor = true;
+        btnCrearBD.Click += btnCrearBD_Click;
+        // 
         // lblConfigEstado
         // 
         lblConfigEstado.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         lblConfigEstado.Location = new Point(24, 166);
         lblConfigEstado.Name = "lblConfigEstado";
         lblConfigEstado.Size = new Size(1136, 36);
-        lblConfigEstado.TabIndex = 4;
+        lblConfigEstado.TabIndex = 5;
         lblConfigEstado.Text = "Sin validar conexión.";
         // 
         // tabConsulta
